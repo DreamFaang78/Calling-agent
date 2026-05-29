@@ -23,8 +23,9 @@ DEFAULTS = {
     "OUTBOUND_TRUNK_ID":       os.getenv("OUTBOUND_TRUNK_ID", ""),
     "DEFAULT_TRANSFER_NUMBER": os.getenv("DEFAULT_TRANSFER_NUMBER", ""),
     "SUPABASE_URL":            os.getenv("SUPABASE_URL", ""),
-    "SUPABASE_SERVICE_KEY":    os.getenv("SUPABASE_SERVICE_KEY", ""),
+    "SUPABASE_SERVICE_ROLE_KEY": os.getenv("SUPABASE_SERVICE_ROLE_KEY", ""),
     "DEEPGRAM_API_KEY":        os.getenv("DEEPGRAM_API_KEY", ""),
+    "GROQ_API_KEY":            os.getenv("GROQ_API_KEY", ""),
 }
 
 
@@ -33,31 +34,31 @@ def _default(key: str) -> str:
 
 
 SUPABASE_URL = _default("SUPABASE_URL")
-SUPABASE_KEY = _default("SUPABASE_SERVICE_KEY")
+SUPABASE_KEY = _default("SUPABASE_SERVICE_ROLE_KEY")
 
 SENSITIVE_KEYS = {
     "LIVEKIT_API_KEY", "LIVEKIT_API_SECRET", "GOOGLE_API_KEY",
-    "VOBIZ_PASSWORD", "TWILIO_AUTH_TOKEN", "SUPABASE_SERVICE_KEY",
+    "VOBIZ_PASSWORD", "TWILIO_AUTH_TOKEN", "SUPABASE_SERVICE_ROLE_KEY",
     "AWS_SECRET_ACCESS_KEY", "S3_SECRET_ACCESS_KEY", "CALCOM_API_KEY",
-    "DEEPGRAM_API_KEY",
+    "DEEPGRAM_API_KEY", "GROQ_API_KEY",
 }
 
 
 def _sdb():
     from supabase import create_client
-    return create_client(_default("SUPABASE_URL"), _default("SUPABASE_SERVICE_KEY"))
+    return create_client(_default("SUPABASE_URL"), _default("SUPABASE_SERVICE_ROLE_KEY"))
 
 
 async def _adb():
     from supabase._async.client import create_client
-    return await create_client(_default("SUPABASE_URL"), _default("SUPABASE_SERVICE_KEY"))
+    return await create_client(_default("SUPABASE_URL"), _default("SUPABASE_SERVICE_ROLE_KEY"))
 
 
 def init_db() -> None:
     url = os.getenv("SUPABASE_URL", SUPABASE_URL)
-    key = os.getenv("SUPABASE_SERVICE_KEY", SUPABASE_KEY)
+    key = os.getenv("SUPABASE_SERVICE_ROLE_KEY", SUPABASE_KEY)
     if not url or not key:
-        print("⚠️  SUPABASE_URL or SUPABASE_SERVICE_KEY not set.")
+        print("⚠️  SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not set.")
         return
     try:
         db = _sdb()

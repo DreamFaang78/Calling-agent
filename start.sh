@@ -20,6 +20,9 @@ SERVER_PID=$!
 sleep 2
 
 echo "🤖 Starting LiveKit agent worker..."
-python agent.py start
+python agent.py start &
+AGENT_PID=$!
 
-kill $SERVER_PID 2>/dev/null || true
+# Keep container alive — wait for both processes
+# If server crashes, Coolify will restart the whole container
+wait $SERVER_PID $AGENT_PID 2>/dev/null || true
