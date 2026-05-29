@@ -1,0 +1,2002 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OutboundAI — AI Voice Calling Platform</title>
+  <meta name="description" content="Production-grade AI outbound voice calling SaaS platform with Gemini Live, campaign management, CRM, and real-time analytics." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    /* ══════════════════════════════════════════════════════════════
+       DESIGN TOKENS & RESET
+    ══════════════════════════════════════════════════════════════ */
+    :root {
+      --bg:        #0a0b0f;
+      --bg2:       #12141a;
+      --bg3:       #1a1d27;
+      --bg4:       #22263a;
+      --border:    #2a2f45;
+      --border2:   #363c56;
+      --text:      #e8eaf6;
+      --text2:     #9ca3c8;
+      --text3:     #6b7199;
+      --accent:    #6c63ff;
+      --accent2:   #a78bfa;
+      --accent3:   #38bdf8;
+      --green:     #22c55e;
+      --red:       #f43f5e;
+      --orange:    #fb923c;
+      --yellow:    #facc15;
+      --pink:      #ec4899;
+      --radius:    12px;
+      --radius-sm: 8px;
+      --shadow:    0 4px 32px rgba(0,0,0,0.5);
+      --glow:      0 0 24px rgba(108,99,255,0.25);
+      --transition: 0.18s ease;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      overflow-x: hidden;
+    }
+
+    /* ══════════════════════════════════════════════════════════════
+       SCROLLBAR
+    ══════════════════════════════════════════════════════════════ */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+
+    /* ══════════════════════════════════════════════════════════════
+       SIDEBAR
+    ══════════════════════════════════════════════════════════════ */
+    #sidebar {
+      width: 240px;
+      min-height: 100vh;
+      background: var(--bg2);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      position: fixed;
+      left: 0; top: 0; bottom: 0;
+      z-index: 100;
+      transition: width var(--transition);
+    }
+
+    .sidebar-logo {
+      padding: 24px 20px 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .logo-icon {
+      width: 36px; height: 36px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
+      box-shadow: var(--glow);
+      flex-shrink: 0;
+    }
+
+    .logo-text { font-size: 16px; font-weight: 700; letter-spacing: -0.02em; }
+    .logo-text span { color: var(--accent2); }
+
+    .nav-section {
+      padding: 16px 12px 8px;
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      color: var(--text3);
+      text-transform: uppercase;
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      margin: 2px 8px;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text2);
+      transition: all var(--transition);
+      text-decoration: none;
+      border: 1px solid transparent;
+    }
+
+    .nav-item:hover {
+      background: var(--bg3);
+      color: var(--text);
+    }
+
+    .nav-item.active {
+      background: linear-gradient(135deg, rgba(108,99,255,0.2), rgba(167,139,250,0.15));
+      color: var(--accent2);
+      border-color: rgba(108,99,255,0.3);
+      box-shadow: inset 0 0 20px rgba(108,99,255,0.08);
+    }
+
+    .nav-item .icon { width: 18px; text-align: center; font-size: 16px; flex-shrink: 0; }
+
+    .nav-badge {
+      margin-left: auto;
+      background: var(--accent);
+      color: white;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 1px 6px;
+      border-radius: 20px;
+    }
+
+    .sidebar-footer {
+      margin-top: auto;
+      padding: 16px;
+      border-top: 1px solid var(--border);
+    }
+
+    .status-dot {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--text3);
+    }
+
+    .dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--green);
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    /* ══════════════════════════════════════════════════════════════
+       MAIN CONTENT
+    ══════════════════════════════════════════════════════════════ */
+    #main {
+      margin-left: 240px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+
+    /* ══════════════════════════════════════════════════════════════
+       TOP BAR
+    ══════════════════════════════════════════════════════════════ */
+    #topbar {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      background: rgba(10, 11, 15, 0.85);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border);
+      padding: 0 28px;
+      height: 64px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    #page-title { font-size: 18px; font-weight: 700; flex: 1; }
+
+    .topbar-actions { display: flex; align-items: center; gap: 10px; }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 16px;
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: all var(--transition);
+      text-decoration: none;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: white;
+      box-shadow: 0 2px 12px rgba(108,99,255,0.4);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 20px rgba(108,99,255,0.5);
+    }
+
+    .btn-secondary {
+      background: var(--bg3);
+      color: var(--text2);
+      border: 1px solid var(--border);
+    }
+
+    .btn-secondary:hover {
+      background: var(--bg4);
+      color: var(--text);
+      border-color: var(--border2);
+    }
+
+    .btn-danger {
+      background: rgba(244, 63, 94, 0.15);
+      color: var(--red);
+      border: 1px solid rgba(244, 63, 94, 0.3);
+    }
+
+    .btn-danger:hover { background: rgba(244, 63, 94, 0.25); }
+
+    .btn-green {
+      background: rgba(34, 197, 94, 0.15);
+      color: var(--green);
+      border: 1px solid rgba(34, 197, 94, 0.3);
+    }
+
+    .btn-green:hover { background: rgba(34, 197, 94, 0.25); }
+
+    .btn-sm { padding: 5px 10px; font-size: 12px; }
+
+    /* ══════════════════════════════════════════════════════════════
+       PAGE CONTENT
+    ══════════════════════════════════════════════════════════════ */
+    .page { display: none; padding: 28px; animation: fadeIn 0.2s ease; }
+    .page.active { display: block; }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ══════════════════════════════════════════════════════════════
+       GRID & CARDS
+    ══════════════════════════════════════════════════════════════ */
+    .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+    .grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+
+    .card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      transition: border-color var(--transition), box-shadow var(--transition);
+    }
+
+    .card:hover { border-color: var(--border2); }
+
+    .stat-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      position: relative;
+      overflow: hidden;
+      transition: all var(--transition);
+    }
+
+    .stat-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+    }
+
+    .stat-card:hover {
+      border-color: rgba(108,99,255,0.3);
+      box-shadow: var(--glow);
+      transform: translateY(-2px);
+    }
+
+    .stat-label { font-size: 12px; font-weight: 500; color: var(--text3); text-transform: uppercase; letter-spacing: 0.06em; }
+    .stat-value { font-size: 32px; font-weight: 800; margin: 6px 0 4px; letter-spacing: -0.02em; }
+    .stat-sub { font-size: 12px; color: var(--text3); }
+    .stat-icon { position: absolute; top: 16px; right: 16px; font-size: 28px; opacity: 0.15; }
+
+    /* ══════════════════════════════════════════════════════════════
+       FORMS
+    ══════════════════════════════════════════════════════════════ */
+    .form-group { margin-bottom: 16px; }
+    .form-label { display: block; font-size: 13px; font-weight: 500; color: var(--text2); margin-bottom: 6px; }
+
+    .form-control {
+      width: 100%;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 10px 14px;
+      font-size: 14px;
+      color: var(--text);
+      font-family: inherit;
+      outline: none;
+      transition: border-color var(--transition), box-shadow var(--transition);
+    }
+
+    .form-control:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(108,99,255,0.15);
+    }
+
+    .form-control::placeholder { color: var(--text3); }
+
+    select.form-control { cursor: pointer; }
+    textarea.form-control { resize: vertical; min-height: 80px; }
+
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .form-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+
+    /* ══════════════════════════════════════════════════════════════
+       TABLES
+    ══════════════════════════════════════════════════════════════ */
+    .table-wrap {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    thead th {
+      background: var(--bg3);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      color: var(--text3);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      border-bottom: 1px solid var(--border);
+    }
+
+    tbody tr {
+      border-bottom: 1px solid rgba(42,47,69,0.5);
+      transition: background var(--transition);
+    }
+
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: rgba(255,255,255,0.02); }
+
+    td {
+      padding: 12px 16px;
+      color: var(--text2);
+      vertical-align: middle;
+    }
+
+    td:first-child { color: var(--text); font-weight: 500; }
+
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--text3);
+    }
+
+    .empty-state .empty-icon { font-size: 48px; margin-bottom: 12px; opacity: 0.4; }
+    .empty-state p { font-size: 14px; }
+
+    /* ══════════════════════════════════════════════════════════════
+       BADGES / CHIPS
+    ══════════════════════════════════════════════════════════════ */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 8px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    .badge-green  { background: rgba(34,197,94,0.15);  color: var(--green);  }
+    .badge-red    { background: rgba(244,63,94,0.15);   color: var(--red);    }
+    .badge-orange { background: rgba(251,146,60,0.15);  color: var(--orange); }
+    .badge-blue   { background: rgba(56,189,248,0.15);  color: var(--accent3);}
+    .badge-purple { background: rgba(108,99,255,0.15);  color: var(--accent2);}
+    .badge-gray   { background: rgba(107,113,153,0.2);  color: var(--text3);  }
+
+    /* ══════════════════════════════════════════════════════════════
+       TOAST NOTIFICATIONS
+    ══════════════════════════════════════════════════════════════ */
+    #toast-container {
+      position: fixed;
+      bottom: 24px; right: 24px;
+      display: flex; flex-direction: column;
+      gap: 8px; z-index: 9999;
+    }
+
+    .toast {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 18px;
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      font-weight: 500;
+      box-shadow: var(--shadow);
+      animation: slideIn 0.2s ease;
+      min-width: 240px;
+      max-width: 360px;
+    }
+
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateX(40px); }
+      to   { opacity: 1; transform: translateX(0); }
+    }
+
+    .toast-success { background: rgba(34,197,94,0.15); border: 1px solid rgba(34,197,94,0.4); color: var(--green); }
+    .toast-error   { background: rgba(244,63,94,0.15);  border: 1px solid rgba(244,63,94,0.4);  color: var(--red);   }
+    .toast-info    { background: rgba(108,99,255,0.15); border: 1px solid rgba(108,99,255,0.4); color: var(--accent2);}
+
+    /* ══════════════════════════════════════════════════════════════
+       MODAL
+    ══════════════════════════════════════════════════════════════ */
+    .modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.7);
+      backdrop-filter: blur(4px);
+      z-index: 1000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-overlay.open { display: flex; }
+
+    .modal {
+      background: var(--bg2);
+      border: 1px solid var(--border2);
+      border-radius: var(--radius);
+      padding: 28px;
+      width: 100%;
+      max-width: 560px;
+      max-height: 90vh;
+      overflow-y: auto;
+      box-shadow: var(--shadow);
+      animation: modalIn 0.2s ease;
+    }
+
+    @keyframes modalIn {
+      from { opacity: 0; transform: scale(0.95); }
+      to   { opacity: 1; transform: scale(1); }
+    }
+
+    .modal-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 20px;
+    }
+
+    .modal-title { font-size: 18px; font-weight: 700; }
+    .modal-close {
+      background: none; border: none; color: var(--text3);
+      font-size: 20px; cursor: pointer; padding: 4px;
+      transition: color var(--transition);
+    }
+    .modal-close:hover { color: var(--text); }
+
+    /* ══════════════════════════════════════════════════════════════
+       CHART CONTAINERS
+    ══════════════════════════════════════════════════════════════ */
+    .chart-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+    }
+
+    .chart-title { font-size: 14px; font-weight: 600; margin-bottom: 16px; color: var(--text2); }
+    .chart-wrap { position: relative; height: 220px; }
+
+    /* ══════════════════════════════════════════════════════════════
+       SECTION HEADERS
+    ══════════════════════════════════════════════════════════════ */
+    .section-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 16px;
+    }
+
+    .section-title { font-size: 16px; font-weight: 700; }
+
+    /* ══════════════════════════════════════════════════════════════
+       SETTINGS ROWS
+    ══════════════════════════════════════════════════════════════ */
+    .settings-group {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      margin-bottom: 24px;
+    }
+
+    .settings-group-header {
+      padding: 14px 20px;
+      background: var(--bg3);
+      border-bottom: 1px solid var(--border);
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text3);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .settings-row {
+      display: flex;
+      align-items: center;
+      padding: 14px 20px;
+      gap: 16px;
+      border-bottom: 1px solid rgba(42,47,69,0.5);
+    }
+
+    .settings-row:last-child { border-bottom: none; }
+
+    .settings-key {
+      width: 220px;
+      flex-shrink: 0;
+      font-size: 13px;
+      font-weight: 600;
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--accent2);
+    }
+
+    .settings-value { flex: 1; }
+    .settings-status { flex-shrink: 0; }
+
+    /* ══════════════════════════════════════════════════════════════
+       LOG STREAM
+    ══════════════════════════════════════════════════════════════ */
+    .log-stream {
+      background: #0d0f14;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      font-family: 'JetBrains Mono', 'Fira Code', monospace;
+      font-size: 12px;
+      height: 420px;
+      overflow-y: auto;
+      line-height: 1.7;
+    }
+
+    .log-line { display: flex; gap: 10px; }
+    .log-ts { color: var(--text3); flex-shrink: 0; }
+    .log-src { color: var(--accent); flex-shrink: 0; min-width: 60px; }
+    .log-level-info    { color: var(--accent3); }
+    .log-level-warning { color: var(--orange); }
+    .log-level-error   { color: var(--red); }
+    .log-msg { color: var(--text2); word-break: break-all; }
+
+    /* ══════════════════════════════════════════════════════════════
+       CALL CARD (for live status)
+    ══════════════════════════════════════════════════════════════ */
+    .call-status-bar {
+      background: linear-gradient(135deg, rgba(108,99,255,0.1), rgba(167,139,250,0.05));
+      border: 1px solid rgba(108,99,255,0.2);
+      border-radius: var(--radius);
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+
+    .pulse-ring {
+      width: 12px; height: 12px;
+      border-radius: 50%;
+      background: var(--green);
+      position: relative;
+      flex-shrink: 0;
+    }
+
+    .pulse-ring::after {
+      content: '';
+      position: absolute;
+      inset: -4px;
+      border: 2px solid var(--green);
+      border-radius: 50%;
+      animation: ring 1.5s infinite;
+      opacity: 0;
+    }
+
+    @keyframes ring {
+      0%   { transform: scale(1); opacity: 0.8; }
+      100% { transform: scale(1.6); opacity: 0; }
+    }
+
+    /* ══════════════════════════════════════════════════════════════
+       RESPONSIVE
+    ══════════════════════════════════════════════════════════════ */
+    @media (max-width: 1200px) {
+      .grid-4 { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    @media (max-width: 900px) {
+      #sidebar { width: 56px; overflow: hidden; }
+      #sidebar .logo-text,
+      #sidebar .nav-item span,
+      #sidebar .nav-section,
+      #sidebar .sidebar-footer { display: none; }
+      #main { margin-left: 56px; }
+      .grid-2 { grid-template-columns: 1fr; }
+    }
+
+    /* ══════════════════════════════════════════════════════════════
+       PHONE INPUT CHIP
+    ══════════════════════════════════════════════════════════════ */
+    .phone-chip {
+      font-family: monospace;
+      background: var(--bg4);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      color: var(--accent3);
+    }
+
+    /* ══════════════════════════════════════════════════════════════
+       TEXTAREA PROMPT EDITOR
+    ══════════════════════════════════════════════════════════════ */
+    .prompt-editor {
+      background: #0d0f14;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 14px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12.5px;
+      line-height: 1.7;
+      color: var(--text);
+      width: 100%;
+      min-height: 320px;
+      resize: vertical;
+      outline: none;
+    }
+
+    .prompt-editor:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(108,99,255,0.15);
+    }
+
+    /* ══════════════════════════════════════════════════════════════
+       TAB BAR
+    ══════════════════════════════════════════════════════════════ */
+    .tab-bar {
+      display: flex;
+      gap: 4px;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 4px;
+      margin-bottom: 20px;
+      width: fit-content;
+    }
+
+    .tab-btn {
+      padding: 6px 16px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      border: none;
+      background: none;
+      color: var(--text3);
+      transition: all var(--transition);
+    }
+
+    .tab-btn.active {
+      background: var(--bg2);
+      color: var(--text);
+      box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+    }
+
+    /* toggle switch */
+    .toggle {
+      position: relative;
+      display: inline-block;
+      width: 36px; height: 20px;
+    }
+
+    .toggle input { opacity: 0; width: 0; height: 0; }
+
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      inset: 0;
+      background: var(--bg4);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      transition: var(--transition);
+    }
+
+    .slider::before {
+      content: '';
+      position: absolute;
+      width: 14px; height: 14px;
+      left: 2px; top: 2px;
+      background: var(--text3);
+      border-radius: 50%;
+      transition: var(--transition);
+    }
+
+    input:checked + .slider { background: var(--accent); border-color: var(--accent); }
+    input:checked + .slider::before { transform: translateX(16px); background: white; }
+  </style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════════════
+     SIDEBAR
+══════════════════════════════════════════════════════ -->
+<nav id="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-icon">🤖</div>
+    <div class="logo-text">Outbound<span>AI</span></div>
+  </div>
+
+  <div class="nav-section">Core</div>
+  <a class="nav-item active" id="nav-dashboard" onclick="showPage('dashboard')">
+    <span class="icon">📊</span> <span>Dashboard</span>
+  </a>
+  <a class="nav-item" id="nav-call" onclick="showPage('call')">
+    <span class="icon">📞</span> <span>Single Call</span>
+  </a>
+  <a class="nav-item" id="nav-batch" onclick="showPage('batch')">
+    <span class="icon">📋</span> <span>Batch CSV</span>
+  </a>
+
+  <div class="nav-section">Automation</div>
+  <a class="nav-item" id="nav-campaigns" onclick="showPage('campaigns')">
+    <span class="icon">🎯</span> <span>Campaigns</span>
+  </a>
+  <a class="nav-item" id="nav-appointments" onclick="showPage('appointments')">
+    <span class="icon">📅</span> <span>Appointments</span>
+  </a>
+
+  <div class="nav-section">Intelligence</div>
+  <a class="nav-item" id="nav-crm" onclick="showPage('crm')">
+    <span class="icon">👥</span> <span>CRM</span>
+  </a>
+  <a class="nav-item" id="nav-logs" onclick="showPage('logs')">
+    <span class="icon">📜</span> <span>Call Logs</span>
+  </a>
+  <a class="nav-item" id="nav-live-logs" onclick="showPage('live-logs')">
+    <span class="icon">⚡</span> <span>Live Logs</span>
+  </a>
+
+  <div class="nav-section">Config</div>
+  <a class="nav-item" id="nav-prompts" onclick="showPage('prompts')">
+    <span class="icon">✍️</span> <span>AI Prompts</span>
+  </a>
+  <a class="nav-item" id="nav-profiles" onclick="showPage('profiles')">
+    <span class="icon">🎭</span> <span>Agent Profiles</span>
+  </a>
+  <a class="nav-item" id="nav-settings" onclick="showPage('settings')">
+    <span class="icon">⚙️</span> <span>Settings</span>
+  </a>
+
+  <div class="sidebar-footer">
+    <div class="status-dot">
+      <div class="dot" id="status-dot"></div>
+      <span id="status-label">Connected</span>
+    </div>
+  </div>
+</nav>
+
+<!-- ══════════════════════════════════════════════════════
+     MAIN
+══════════════════════════════════════════════════════ -->
+<div id="main">
+  <div id="topbar">
+    <div id="page-title">Dashboard</div>
+    <div class="topbar-actions">
+      <button class="btn btn-secondary btn-sm" onclick="refreshAll()">🔄 Refresh</button>
+      <button class="btn btn-primary btn-sm" onclick="showPage('call')">📞 New Call</button>
+    </div>
+  </div>
+
+  <!-- ═══════════════ DASHBOARD ═══════════════ -->
+  <div class="page active" id="page-dashboard">
+    <div class="grid-4" id="stat-cards">
+      <div class="stat-card">
+        <div class="stat-icon">📞</div>
+        <div class="stat-label">Total Calls</div>
+        <div class="stat-value" id="stat-total">—</div>
+        <div class="stat-sub">All time</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">✅</div>
+        <div class="stat-label">Booked</div>
+        <div class="stat-value" id="stat-booked" style="color:var(--green)">—</div>
+        <div class="stat-sub" id="stat-rate">— booking rate</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">⏱️</div>
+        <div class="stat-label">Avg Duration</div>
+        <div class="stat-value" id="stat-dur">—</div>
+        <div class="stat-sub">seconds per call</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">❌</div>
+        <div class="stat-label">Not Interested</div>
+        <div class="stat-value" id="stat-ni" style="color:var(--red)">—</div>
+        <div class="stat-sub">declined</div>
+      </div>
+    </div>
+
+    <div class="grid-2" style="margin-bottom:24px">
+      <div class="chart-card">
+        <div class="chart-title">📈 Calls Over Last 14 Days</div>
+        <div class="chart-wrap"><canvas id="chart-timeline"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">🥧 Outcome Breakdown</div>
+        <div class="chart-wrap"><canvas id="chart-outcomes"></canvas></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="chart-title">⏱️ Average Duration by Outcome (seconds)</div>
+      <div class="chart-wrap"><canvas id="chart-duration"></canvas></div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ SINGLE CALL ═══════════════ -->
+  <div class="page" id="page-call">
+    <div style="max-width:560px">
+      <div class="card">
+        <h2 style="font-size:16px;font-weight:700;margin-bottom:20px">📞 Place Outbound AI Call</h2>
+        <div class="form-group">
+          <label class="form-label">Phone Number *</label>
+          <input class="form-control" id="call-phone" type="tel" placeholder="+919876543210" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Lead Name</label>
+          <input class="form-control" id="call-name" type="text" placeholder="Rahul Sharma" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Agent Profile</label>
+          <select class="form-control" id="call-profile">
+            <option value="">Default (from settings)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Custom System Prompt (optional)</label>
+          <textarea class="form-control" id="call-prompt" rows="4" placeholder="Leave blank to use agent profile / default prompt..."></textarea>
+        </div>
+        <button class="btn btn-primary" style="width:100%" onclick="placeCall()">
+          📞 Dial Now
+        </button>
+      </div>
+
+      <div class="call-status-bar" id="call-status-bar" style="display:none;margin-top:16px">
+        <div class="pulse-ring"></div>
+        <div>
+          <div style="font-weight:600">Call Active</div>
+          <div id="call-status-detail" style="font-size:12px;color:var(--text3)">Connecting...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ BATCH CSV ═══════════════ -->
+  <div class="page" id="page-batch">
+    <div style="max-width:680px">
+      <div class="card" style="margin-bottom:20px">
+        <h2 style="font-size:16px;font-weight:700;margin-bottom:4px">📋 Batch Call from CSV</h2>
+        <p style="font-size:13px;color:var(--text3);margin-bottom:20px">Upload a CSV with columns: <code>phone</code>, <code>name</code></p>
+
+        <div class="form-group">
+          <label class="form-label">CSV File *</label>
+          <input type="file" class="form-control" id="csv-file" accept=".csv" />
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Delay Between Calls (seconds)</label>
+            <input class="form-control" id="csv-delay" type="number" value="3" min="1" max="60" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Agent Profile</label>
+            <select class="form-control" id="csv-profile">
+              <option value="">Default</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Custom Prompt (optional)</label>
+          <textarea class="form-control" id="csv-prompt" rows="3" placeholder="Leave blank for default..."></textarea>
+        </div>
+        <button class="btn btn-primary" style="width:100%" onclick="runCSVBatch()">🚀 Start Batch</button>
+      </div>
+
+      <div id="batch-results" style="display:none">
+        <div class="section-header">
+          <div class="section-title">Results</div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Phone</th><th>Name</th><th>Status</th></tr>
+            </thead>
+            <tbody id="batch-results-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ CAMPAIGNS ═══════════════ -->
+  <div class="page" id="page-campaigns">
+    <div class="section-header">
+      <div class="section-title">Campaigns</div>
+      <button class="btn btn-primary" onclick="openNewCampaignModal()">+ New Campaign</button>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Name</th><th>Schedule</th><th>Contacts</th><th>Dispatched</th><th>Failed</th><th>Last Run</th><th>Status</th><th>Actions</th></tr>
+        </thead>
+        <tbody id="campaigns-body">
+          <tr><td colspan="8"><div class="empty-state"><div class="empty-icon">🎯</div><p>No campaigns yet</p></div></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ═══════════════ APPOINTMENTS ═══════════════ -->
+  <div class="page" id="page-appointments">
+    <div class="section-header">
+      <div class="section-title">Appointments</div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input type="date" class="form-control" id="appt-date-filter" style="width:180px" oninput="loadAppointments()" />
+        <button class="btn btn-secondary btn-sm" onclick="document.getElementById('appt-date-filter').value='';loadAppointments()">Clear</button>
+        <button class="btn btn-primary btn-sm" onclick="openNewApptModal()">+ Add</button>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Name</th><th>Phone</th><th>Date</th><th>Time</th><th>Service</th><th>Status</th><th>Actions</th></tr>
+        </thead>
+        <tbody id="appointments-body">
+          <tr><td colspan="7"><div class="empty-state"><div class="empty-icon">📅</div><p>No appointments</p></div></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ═══════════════ CRM ═══════════════ -->
+  <div class="page" id="page-crm">
+    <div class="section-header">
+      <div class="section-title">CRM — Contact Directory</div>
+      <input class="form-control" id="crm-search" placeholder="Search by phone or name..." style="width:260px" oninput="filterCRM()" />
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Phone</th><th>Name</th><th>Total Calls</th><th>Booked</th><th>Last Call</th><th>Last Outcome</th><th>Actions</th></tr>
+        </thead>
+        <tbody id="crm-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ═══════════════ CALL LOGS ═══════════════ -->
+  <div class="page" id="page-logs">
+    <div class="section-header">
+      <div class="section-title">Call Logs</div>
+      <div style="display:flex;gap:8px">
+        <select class="form-control" id="logs-page-select" style="width:120px" onchange="loadCallLogs()">
+          <option value="1">Page 1</option>
+          <option value="2">Page 2</option>
+          <option value="3">Page 3</option>
+        </select>
+        <button class="btn btn-secondary btn-sm" onclick="loadCallLogs()">🔄 Refresh</button>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Time</th><th>Phone</th><th>Lead</th><th>Outcome</th><th>Duration</th><th>Notes</th><th>Recording</th></tr>
+        </thead>
+        <tbody id="call-logs-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ═══════════════ LIVE LOGS ═══════════════ -->
+  <div class="page" id="page-live-logs">
+    <div class="section-header">
+      <div class="section-title">⚡ Live System Logs</div>
+      <div style="display:flex;gap:8px">
+        <select class="form-control" id="log-level-filter" style="width:120px" onchange="loadLiveLogs()">
+          <option value="">All Levels</option>
+          <option value="info">Info</option>
+          <option value="warning">Warning</option>
+          <option value="error">Error</option>
+        </select>
+        <select class="form-control" id="log-source-filter" style="width:120px" onchange="loadLiveLogs()">
+          <option value="">All Sources</option>
+          <option value="agent">Agent</option>
+          <option value="server">Server</option>
+        </select>
+        <button class="btn btn-secondary btn-sm" onclick="loadLiveLogs()">🔄</button>
+        <button class="btn btn-danger btn-sm" onclick="clearLogs()">🗑 Clear</button>
+      </div>
+    </div>
+    <div class="log-stream" id="log-stream">
+      <div style="color:var(--text3);font-size:11px">Waiting for logs...</div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ AI PROMPTS ═══════════════ -->
+  <div class="page" id="page-prompts">
+    <div style="max-width:900px">
+      <div class="section-header" style="margin-bottom:20px">
+        <div class="section-title">✍️ AI Prompt Editor</div>
+        <button class="btn btn-primary" onclick="savePrompt()">💾 Save Prompt</button>
+      </div>
+      <div class="card">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+          <div style="flex:1">
+            <div style="font-size:13px;font-weight:600;margin-bottom:4px">Global Default System Prompt</div>
+            <div style="font-size:12px;color:var(--text3)">
+              Available variables: <code>{lead_name}</code> <code>{business_name}</code> <code>{service_type}</code>
+            </div>
+          </div>
+          <button class="btn btn-secondary btn-sm" onclick="resetPrompt()">↩ Reset to Default</button>
+        </div>
+        <textarea class="prompt-editor" id="prompt-editor"></textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ AGENT PROFILES ═══════════════ -->
+  <div class="page" id="page-profiles">
+    <div class="section-header">
+      <div class="section-title">🎭 Agent Profiles</div>
+      <button class="btn btn-primary" onclick="openNewProfileModal()">+ New Profile</button>
+    </div>
+    <div id="profiles-grid" class="grid-3"></div>
+  </div>
+
+  <!-- ═══════════════ SETTINGS ═══════════════ -->
+  <div class="page" id="page-settings">
+    <div style="max-width:860px">
+      <div class="section-header" style="margin-bottom:24px">
+        <div class="section-title">⚙️ Settings — BYOK</div>
+        <button class="btn btn-primary" onclick="saveSettings()">💾 Save All</button>
+      </div>
+      <div id="settings-container"></div>
+    </div>
+  </div>
+
+</div><!-- end #main -->
+
+<!-- ══════════════════════════════════════════════════════
+     MODALS
+══════════════════════════════════════════════════════ -->
+
+<!-- New Campaign Modal -->
+<div class="modal-overlay" id="modal-campaign">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">🎯 New Campaign</div>
+      <button class="modal-close" onclick="closeModal('modal-campaign')">✕</button>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Campaign Name *</label>
+      <input class="form-control" id="c-name" placeholder="Q4 Follow-up" />
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Schedule Type</label>
+        <select class="form-control" id="c-schedule-type">
+          <option value="once">Once (immediate)</option>
+          <option value="daily">Daily</option>
+          <option value="weekdays">Weekdays</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Run Time</label>
+        <input class="form-control" id="c-schedule-time" type="time" value="09:00" />
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Delay Between Calls (s)</label>
+        <input class="form-control" id="c-delay" type="number" value="3" min="1" max="60" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Agent Profile</label>
+        <select class="form-control" id="c-profile">
+          <option value="">Default</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Contacts (CSV paste: phone,name per line)</label>
+      <textarea class="form-control" id="c-contacts" rows="6" placeholder="+919876543210,Rahul Sharma&#10;+919123456789,Priya Patel"></textarea>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Custom System Prompt (optional)</label>
+      <textarea class="form-control" id="c-prompt" rows="3"></textarea>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn btn-secondary" onclick="closeModal('modal-campaign')">Cancel</button>
+      <button class="btn btn-primary" onclick="createCampaign()">Create & Schedule</button>
+    </div>
+  </div>
+</div>
+
+<!-- New Appointment Modal -->
+<div class="modal-overlay" id="modal-appointment">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">📅 New Appointment</div>
+      <button class="modal-close" onclick="closeModal('modal-appointment')">✕</button>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Name *</label>
+        <input class="form-control" id="a-name" placeholder="Rahul Sharma" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Phone *</label>
+        <input class="form-control" id="a-phone" placeholder="+919876543210" />
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Date *</label>
+        <input class="form-control" id="a-date" type="date" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Time *</label>
+        <input class="form-control" id="a-time" type="time" />
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Service *</label>
+      <input class="form-control" id="a-service" placeholder="Consultation" />
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn btn-secondary" onclick="closeModal('modal-appointment')">Cancel</button>
+      <button class="btn btn-primary" onclick="createAppointment()">Book</button>
+    </div>
+  </div>
+</div>
+
+<!-- New Agent Profile Modal -->
+<div class="modal-overlay" id="modal-profile">
+  <div class="modal" style="max-width:640px">
+    <div class="modal-header">
+      <div class="modal-title">🎭 New Agent Profile</div>
+      <button class="modal-close" onclick="closeModal('modal-profile')">✕</button>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Profile Name *</label>
+        <input class="form-control" id="p-name" placeholder="Sales Agent" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Voice</label>
+        <select class="form-control" id="p-voice">
+          <option value="Aoede">Aoede (default)</option>
+          <option value="Charon">Charon</option>
+          <option value="Fenrir">Fenrir</option>
+          <option value="Kore">Kore</option>
+          <option value="Puck">Puck</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Model</label>
+        <select class="form-control" id="p-model">
+          <option value="gemini-3.1-flash-live-preview">gemini-3.1-flash-live-preview</option>
+          <option value="gemini-2.0-flash-live-001">gemini-2.0-flash-live-001</option>
+        </select>
+      </div>
+      <div class="form-group" style="display:flex;align-items:flex-end">
+        <div style="display:flex;align-items:center;gap:10px;padding-bottom:4px">
+          <label class="toggle">
+            <input type="checkbox" id="p-default" />
+            <span class="slider"></span>
+          </label>
+          <span style="font-size:13px;color:var(--text2)">Set as default</span>
+        </div>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">System Prompt</label>
+      <textarea class="prompt-editor" id="p-prompt" style="min-height:180px"></textarea>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn btn-secondary" onclick="closeModal('modal-profile')">Cancel</button>
+      <button class="btn btn-primary" onclick="createProfile()">Create Profile</button>
+    </div>
+  </div>
+</div>
+
+<!-- CRM Memory Modal -->
+<div class="modal-overlay" id="modal-memory">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">🧠 Contact Memory</div>
+      <button class="modal-close" onclick="closeModal('modal-memory')">✕</button>
+    </div>
+    <div id="memory-content" style="margin-bottom:16px"></div>
+    <div class="form-group">
+      <label class="form-label">Add Insight</label>
+      <input class="form-control" id="memory-new-insight" placeholder="e.g. Prefers morning calls" />
+    </div>
+    <div style="display:flex;justify-content:flex-end">
+      <button class="btn btn-primary" onclick="addMemoryInsight()">+ Add</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast container -->
+<div id="toast-container"></div>
+
+<!-- ══════════════════════════════════════════════════════
+     JAVASCRIPT
+══════════════════════════════════════════════════════ -->
+<script>
+  const API = '';  // same-origin — server is on :8000, dashboard served from /ui
+  let _allContacts = [];
+  let _currentMemoryPhone = '';
+  let _charts = {};
+  let _liveLogInterval = null;
+
+  // ─── Page routing ────────────────────────────────────────────────
+  function showPage(id) {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    document.getElementById('page-' + id).classList.add('active');
+    const nav = document.getElementById('nav-' + id);
+    if (nav) nav.classList.add('active');
+    const titles = {
+      dashboard: 'Dashboard',
+      call: '📞 Single Call',
+      batch: '📋 Batch CSV Calling',
+      campaigns: '🎯 Campaigns',
+      appointments: '📅 Appointments',
+      crm: '👥 CRM',
+      logs: '📜 Call Logs',
+      'live-logs': '⚡ Live Logs',
+      prompts: '✍️ AI Prompts',
+      profiles: '🎭 Agent Profiles',
+      settings: '⚙️ Settings',
+    };
+    document.getElementById('page-title').textContent = titles[id] || id;
+
+    // lazy-load data per page
+    const loaders = {
+      dashboard: loadDashboard,
+      campaigns: loadCampaigns,
+      appointments: loadAppointments,
+      crm: loadCRM,
+      logs: loadCallLogs,
+      'live-logs': startLiveLogs,
+      prompts: loadPrompt,
+      profiles: loadProfiles,
+      settings: loadSettings,
+    };
+    if (loaders[id]) loaders[id]();
+    if (id !== 'live-logs' && _liveLogInterval) { clearInterval(_liveLogInterval); _liveLogInterval = null; }
+  }
+
+  // ─── Toast ───────────────────────────────────────────────────────
+  function toast(msg, type = 'success') {
+    const el = document.createElement('div');
+    el.className = `toast toast-${type}`;
+    el.innerHTML = `<span>${type === 'success' ? '✅' : type === 'error' ? '❌' : 'ℹ️'}</span><span>${msg}</span>`;
+    document.getElementById('toast-container').appendChild(el);
+    setTimeout(() => el.remove(), 4000);
+  }
+
+  // ─── API helper ──────────────────────────────────────────────────
+  async function api(path, opts = {}) {
+    const r = await fetch(API + path, {
+      headers: { 'Content-Type': 'application/json' },
+      ...opts,
+    });
+    if (!r.ok) {
+      const t = await r.text();
+      throw new Error(t || r.status);
+    }
+    return r.json();
+  }
+
+  // ─── Dashboard ───────────────────────────────────────────────────
+  async function loadDashboard() {
+    try {
+      const stats = await api('/stats');
+      document.getElementById('stat-total').textContent = stats.total_calls ?? 0;
+      document.getElementById('stat-booked').textContent = stats.booked ?? 0;
+      document.getElementById('stat-rate').textContent = `${stats.booking_rate_percent ?? 0}% booking rate`;
+      document.getElementById('stat-dur').textContent = stats.avg_duration_seconds ?? 0;
+      document.getElementById('stat-ni').textContent = stats.not_interested ?? 0;
+      renderCharts(stats);
+    } catch (e) {
+      toast('Could not load stats: ' + e.message, 'error');
+    }
+  }
+
+  function renderCharts(stats) {
+    const palette = ['#6c63ff','#a78bfa','#38bdf8','#22c55e','#fb923c','#f43f5e','#facc15','#ec4899'];
+
+    // Timeline
+    const tl = stats.timeline || [];
+    const tlCtx = document.getElementById('chart-timeline').getContext('2d');
+    if (_charts.timeline) _charts.timeline.destroy();
+    _charts.timeline = new Chart(tlCtx, {
+      type: 'line',
+      data: {
+        labels: tl.map(d => d.date.slice(5)),
+        datasets: [{
+          label: 'Calls',
+          data: tl.map(d => d.count),
+          borderColor: '#6c63ff',
+          backgroundColor: 'rgba(108,99,255,0.12)',
+          fill: true,
+          tension: 0.4,
+          pointRadius: 3,
+          pointBackgroundColor: '#6c63ff',
+        }],
+      },
+      options: { ...chartOpts(), plugins: { legend: { display: false } } },
+    });
+
+    // Outcomes pie
+    const oc = stats.outcomes || {};
+    const ocLabels = Object.keys(oc);
+    const ocCtx = document.getElementById('chart-outcomes').getContext('2d');
+    if (_charts.outcomes) _charts.outcomes.destroy();
+    _charts.outcomes = new Chart(ocCtx, {
+      type: 'doughnut',
+      data: {
+        labels: ocLabels,
+        datasets: [{
+          data: ocLabels.map(k => oc[k]),
+          backgroundColor: palette,
+          borderWidth: 0,
+          hoverOffset: 8,
+        }],
+      },
+      options: {
+        ...chartOpts(),
+        cutout: '65%',
+        plugins: {
+          legend: { position: 'right', labels: { color: '#9ca3c8', font: { size: 11 } } },
+        },
+      },
+    });
+
+    // Duration bar
+    const dur = stats.duration_by_outcome || {};
+    const durLabels = Object.keys(dur);
+    const durCtx = document.getElementById('chart-duration').getContext('2d');
+    if (_charts.duration) _charts.duration.destroy();
+    _charts.duration = new Chart(durCtx, {
+      type: 'bar',
+      data: {
+        labels: durLabels,
+        datasets: [{
+          label: 'Avg Duration (s)',
+          data: durLabels.map(k => Math.round(dur[k])),
+          backgroundColor: palette,
+          borderRadius: 6,
+        }],
+      },
+      options: {
+        ...chartOpts(),
+        plugins: { legend: { display: false } },
+        scales: {
+          y: { ticks: { color: '#6b7199' }, grid: { color: 'rgba(42,47,69,0.5)' } },
+          x: { ticks: { color: '#6b7199' }, grid: { display: false } },
+        },
+      },
+    });
+  }
+
+  function chartOpts() {
+    return {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { labels: { color: '#9ca3c8' } },
+        tooltip: {
+          backgroundColor: '#1a1d27',
+          borderColor: '#2a2f45',
+          borderWidth: 1,
+          titleColor: '#e8eaf6',
+          bodyColor: '#9ca3c8',
+        },
+      },
+    };
+  }
+
+  // ─── Single Call ──────────────────────────────────────────────────
+  async function placeCall() {
+    const phone = document.getElementById('call-phone').value.trim();
+    if (!phone) { toast('Phone number required', 'error'); return; }
+    const name = document.getElementById('call-name').value.trim() || 'there';
+    const profile = document.getElementById('call-profile').value;
+    const prompt = document.getElementById('call-prompt').value.trim();
+    try {
+      const r = await api('/call/single', {
+        method: 'POST',
+        body: JSON.stringify({ phone_number: phone, lead_name: name, agent_profile_id: profile || null, system_prompt: prompt || null }),
+      });
+      toast(`Call dispatched to ${phone}!`);
+      const bar = document.getElementById('call-status-bar');
+      bar.style.display = 'flex';
+      document.getElementById('call-status-detail').textContent = `Room: ${r.room_name}`;
+    } catch (e) {
+      toast('Call failed: ' + e.message, 'error');
+    }
+  }
+
+  // ─── Batch CSV ────────────────────────────────────────────────────
+  async function runCSVBatch() {
+    const fileInput = document.getElementById('csv-file');
+    if (!fileInput.files[0]) { toast('Please select a CSV file', 'error'); return; }
+    const fd = new FormData();
+    fd.append('file', fileInput.files[0]);
+    fd.append('delay_seconds', document.getElementById('csv-delay').value);
+    fd.append('system_prompt', document.getElementById('csv-prompt').value);
+    fd.append('agent_profile_id', document.getElementById('csv-profile').value);
+    try {
+      const r = await fetch(API + '/call/csv', { method: 'POST', body: fd }).then(x => x.json());
+      const results = r.results || [];
+      document.getElementById('batch-results').style.display = 'block';
+      document.getElementById('batch-results-body').innerHTML = results.map(row =>
+        `<tr><td><span class="phone-chip">${row.phone}</span></td><td>${row.name || '—'}</td><td>${statusBadge(row.status)}</td></tr>`
+      ).join('');
+      toast(`Batch: ${results.filter(x => x.status === 'dispatched').length} dispatched`);
+    } catch (e) {
+      toast('Batch failed: ' + e.message, 'error');
+    }
+  }
+
+  function statusBadge(s) {
+    const map = { dispatched: 'badge-green', failed: 'badge-red', skipped: 'badge-gray', booked: 'badge-green', active: 'badge-blue', paused: 'badge-orange', completed: 'badge-purple', cancelled: 'badge-red', not_interested: 'badge-red', voicemail: 'badge-gray', no_answer: 'badge-gray', callback_requested: 'badge-orange', wrong_number: 'badge-gray' };
+    return `<span class="badge ${map[s] || 'badge-gray'}">${s}</span>`;
+  }
+
+  // ─── Campaigns ────────────────────────────────────────────────────
+  async function loadCampaigns() {
+    try {
+      const camps = await api('/campaigns');
+      const body = document.getElementById('campaigns-body');
+      if (!camps.length) {
+        body.innerHTML = `<tr><td colspan="8"><div class="empty-state"><div class="empty-icon">🎯</div><p>No campaigns yet</p></div></td></tr>`;
+        return;
+      }
+      body.innerHTML = camps.map(c => {
+        const contacts = JSON.parse(c.contacts_json || '[]');
+        const lastRun = c.last_run_at ? c.last_run_at.slice(0, 16) : '—';
+        return `<tr>
+          <td>${c.name}</td>
+          <td>${c.schedule_type} @ ${c.schedule_time || '—'}</td>
+          <td>${contacts.length}</td>
+          <td>${c.total_dispatched ?? 0}</td>
+          <td>${c.total_failed ?? 0}</td>
+          <td style="color:var(--text3)">${lastRun}</td>
+          <td>${statusBadge(c.status)}</td>
+          <td>
+            <div style="display:flex;gap:4px">
+              ${c.status === 'active' ? `<button class="btn btn-secondary btn-sm" onclick="pauseCampaign('${c.id}')">⏸</button>` : `<button class="btn btn-green btn-sm" onclick="resumeCampaign('${c.id}')">▶</button>`}
+              <button class="btn btn-primary btn-sm" onclick="runCampaignNow('${c.id}')">▶ Now</button>
+              <button class="btn btn-danger btn-sm" onclick="deleteCampaign('${c.id}')">🗑</button>
+            </div>
+          </td>
+        </tr>`;
+      }).join('');
+    } catch (e) {
+      toast('Could not load campaigns: ' + e.message, 'error');
+    }
+  }
+
+  function openNewCampaignModal() {
+    loadProfilesIntoSelects();
+    document.getElementById('modal-campaign').classList.add('open');
+  }
+
+  async function createCampaign() {
+    const name = document.getElementById('c-name').value.trim();
+    if (!name) { toast('Campaign name required', 'error'); return; }
+    const raw = document.getElementById('c-contacts').value.trim();
+    const contacts = raw.split('\n').filter(Boolean).map(line => {
+      const parts = line.split(',');
+      return { phone: (parts[0] || '').trim(), name: (parts[1] || 'there').trim() };
+    }).filter(c => c.phone);
+    if (!contacts.length) { toast('Add at least one contact', 'error'); return; }
+    try {
+      await api('/campaigns', {
+        method: 'POST',
+        body: JSON.stringify({
+          name,
+          contacts,
+          schedule_type: document.getElementById('c-schedule-type').value,
+          schedule_time: document.getElementById('c-schedule-time').value,
+          call_delay_seconds: parseInt(document.getElementById('c-delay').value),
+          system_prompt: document.getElementById('c-prompt').value || null,
+          agent_profile_id: document.getElementById('c-profile').value || null,
+        }),
+      });
+      toast('Campaign created and scheduled!');
+      closeModal('modal-campaign');
+      loadCampaigns();
+    } catch (e) { toast('Error: ' + e.message, 'error'); }
+  }
+
+  async function pauseCampaign(id) {
+    await api(`/campaigns/${id}/pause`, { method: 'POST' });
+    toast('Campaign paused'); loadCampaigns();
+  }
+
+  async function resumeCampaign(id) {
+    await api(`/campaigns/${id}/resume`, { method: 'POST' });
+    toast('Campaign resumed'); loadCampaigns();
+  }
+
+  async function runCampaignNow(id) {
+    await api(`/campaigns/${id}/run`, { method: 'POST' });
+    toast('Campaign started now!');
+  }
+
+  async function deleteCampaign(id) {
+    if (!confirm('Delete this campaign?')) return;
+    await api(`/campaigns/${id}`, { method: 'DELETE' });
+    toast('Deleted'); loadCampaigns();
+  }
+
+  // ─── Appointments ─────────────────────────────────────────────────
+  async function loadAppointments() {
+    const dateFilter = document.getElementById('appt-date-filter').value;
+    try {
+      const appts = await api('/appointments' + (dateFilter ? `?date=${dateFilter}` : ''));
+      const body = document.getElementById('appointments-body');
+      if (!appts.length) {
+        body.innerHTML = `<tr><td colspan="7"><div class="empty-state"><div class="empty-icon">📅</div><p>No appointments</p></div></td></tr>`;
+        return;
+      }
+      body.innerHTML = appts.map(a => `<tr>
+        <td>${a.name}</td>
+        <td><span class="phone-chip">${a.phone}</span></td>
+        <td>${a.date}</td>
+        <td>${a.time}</td>
+        <td>${a.service}</td>
+        <td>${statusBadge(a.status)}</td>
+        <td>
+          ${a.status === 'booked' ? `<button class="btn btn-danger btn-sm" onclick="cancelAppointment('${a.id}')">Cancel</button>` : ''}
+        </td>
+      </tr>`).join('');
+    } catch (e) { toast('Load failed: ' + e.message, 'error'); }
+  }
+
+  function openNewApptModal() {
+    document.getElementById('modal-appointment').classList.add('open');
+  }
+
+  async function createAppointment() {
+    const name = document.getElementById('a-name').value.trim();
+    const phone = document.getElementById('a-phone').value.trim();
+    const date = document.getElementById('a-date').value;
+    const time = document.getElementById('a-time').value;
+    const service = document.getElementById('a-service').value.trim();
+    if (!name || !phone || !date || !time || !service) { toast('All fields required', 'error'); return; }
+    try {
+      await api('/appointments', { method: 'POST', body: JSON.stringify({ name, phone, date, time, service }) });
+      toast('Appointment booked!');
+      closeModal('modal-appointment');
+      loadAppointments();
+    } catch (e) { toast('Error: ' + e.message, 'error'); }
+  }
+
+  async function cancelAppointment(id) {
+    if (!confirm('Cancel this appointment?')) return;
+    await api(`/appointments/${id}`, { method: 'DELETE' });
+    toast('Cancelled'); loadAppointments();
+  }
+
+  // ─── CRM ──────────────────────────────────────────────────────────
+  async function loadCRM() {
+    try {
+      _allContacts = await api('/contacts');
+      renderCRM(_allContacts);
+    } catch (e) { toast('CRM load failed: ' + e.message, 'error'); }
+  }
+
+  function renderCRM(contacts) {
+    const body = document.getElementById('crm-body');
+    if (!contacts.length) {
+      body.innerHTML = `<tr><td colspan="7"><div class="empty-state"><div class="empty-icon">👥</div><p>No contacts yet</p></div></td></tr>`;
+      return;
+    }
+    body.innerHTML = contacts.map(c => `<tr>
+      <td><span class="phone-chip">${c.phone_number}</span></td>
+      <td>${c.lead_name || '—'}</td>
+      <td>${c.total_calls}</td>
+      <td><span class="badge badge-green">${c.booked}</span></td>
+      <td style="color:var(--text3)">${(c.last_call || '').slice(0,16)}</td>
+      <td>${statusBadge(c.last_outcome || 'unknown')}</td>
+      <td>
+        <div style="display:flex;gap:4px">
+          <button class="btn btn-secondary btn-sm" onclick="openMemory('${c.phone_number}')">🧠 Memory</button>
+          <button class="btn btn-primary btn-sm" onclick="callContact('${c.phone_number}','${c.lead_name || ''}')">📞 Call</button>
+        </div>
+      </td>
+    </tr>`).join('');
+  }
+
+  function filterCRM() {
+    const q = document.getElementById('crm-search').value.toLowerCase();
+    renderCRM(_allContacts.filter(c =>
+      (c.phone_number || '').includes(q) || (c.lead_name || '').toLowerCase().includes(q)
+    ));
+  }
+
+  function callContact(phone, name) {
+    showPage('call');
+    document.getElementById('call-phone').value = phone;
+    document.getElementById('call-name').value = name;
+  }
+
+  async function openMemory(phone) {
+    _currentMemoryPhone = phone;
+    const mems = await api(`/contacts/${encodeURIComponent(phone)}/memory`);
+    const content = document.getElementById('memory-content');
+    if (!mems.length) {
+      content.innerHTML = `<p style="color:var(--text3);font-size:13px">No memories stored yet.</p>`;
+    } else {
+      content.innerHTML = `<div style="display:flex;flex-direction:column;gap:8px">` +
+        mems.map(m => `<div style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-size:13px">
+          <div style="color:var(--text)">${m.insight}</div>
+          <div style="color:var(--text3);font-size:11px;margin-top:4px">${(m.created_at || '').slice(0,16)}</div>
+        </div>`).join('') + `</div>`;
+    }
+    document.getElementById('memory-new-insight').value = '';
+    document.getElementById('modal-memory').classList.add('open');
+  }
+
+  async function addMemoryInsight() {
+    const insight = document.getElementById('memory-new-insight').value.trim();
+    if (!insight) return;
+    await api(`/contacts/${encodeURIComponent(_currentMemoryPhone)}/memory`, {
+      method: 'POST', body: JSON.stringify({ insight }),
+    });
+    toast('Memory saved!');
+    openMemory(_currentMemoryPhone);
+  }
+
+  // ─── Call Logs ────────────────────────────────────────────────────
+  async function loadCallLogs() {
+    const page = parseInt(document.getElementById('logs-page-select').value) || 1;
+    try {
+      const calls = await api(`/calls?page=${page}&limit=20`);
+      const body = document.getElementById('call-logs-body');
+      if (!calls.length) {
+        body.innerHTML = `<tr><td colspan="7"><div class="empty-state"><div class="empty-icon">📜</div><p>No call logs</p></div></td></tr>`;
+        return;
+      }
+      body.innerHTML = calls.map(c => `<tr>
+        <td style="color:var(--text3);font-size:12px">${(c.timestamp || '').slice(0,16)}</td>
+        <td><span class="phone-chip">${c.phone_number}</span></td>
+        <td>${c.lead_name || '—'}</td>
+        <td>${statusBadge(c.outcome || 'unknown')}</td>
+        <td>${c.duration_seconds ?? '—'}s</td>
+        <td>
+          <input style="background:transparent;border:none;outline:none;width:160px;font-size:12px;color:var(--text2)" 
+            value="${(c.notes || '').replace(/"/g, '&quot;')}" 
+            onblur="updateNotes('${c.id}', this.value)" 
+            placeholder="Add note..." />
+        </td>
+        <td>
+          ${c.recording_url ? `<a href="${c.recording_url}" target="_blank" class="btn btn-secondary btn-sm">🎙 Play</a>` : '<span style="color:var(--text3);font-size:12px">—</span>'}
+        </td>
+      </tr>`).join('');
+    } catch (e) { toast('Load failed: ' + e.message, 'error'); }
+  }
+
+  async function updateNotes(id, notes) {
+    try {
+      await api(`/calls/${id}/notes`, { method: 'PATCH', body: JSON.stringify({ notes }) });
+    } catch (e) { /* silent */ }
+  }
+
+  // ─── Live Logs ────────────────────────────────────────────────────
+  function startLiveLogs() {
+    loadLiveLogs();
+    if (!_liveLogInterval) {
+      _liveLogInterval = setInterval(loadLiveLogs, 5000);
+    }
+  }
+
+  async function loadLiveLogs() {
+    const level = document.getElementById('log-level-filter').value;
+    const source = document.getElementById('log-source-filter').value;
+    let url = `/logs?limit=200`;
+    if (level) url += `&level=${level}`;
+    if (source) url += `&source=${source}`;
+    try {
+      const logs = await api(url);
+      const stream = document.getElementById('log-stream');
+      if (!logs.length) {
+        stream.innerHTML = `<div style="color:var(--text3)">No logs found.</div>`;
+        return;
+      }
+      stream.innerHTML = logs.map(l => `<div class="log-line">
+        <span class="log-ts">${(l.timestamp || '').slice(11,19)}</span>
+        <span class="log-src">[${l.source}]</span>
+        <span class="log-level-${l.level || 'info'}">[${(l.level || 'info').toUpperCase()}]</span>
+        <span class="log-msg">${escHtml(l.message)}${l.detail ? ` — ${escHtml(l.detail.slice(0,120))}` : ''}</span>
+      </div>`).join('');
+      stream.scrollTop = stream.scrollHeight;
+    } catch (e) { /* silent */ }
+  }
+
+  async function clearLogs() {
+    if (!confirm('Clear all logs?')) return;
+    await api('/logs', { method: 'DELETE' });
+    toast('Logs cleared');
+    loadLiveLogs();
+  }
+
+  function escHtml(s) {
+    return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  // ─── AI Prompts ───────────────────────────────────────────────────
+  const DEFAULT_PROMPT = `You are Priya, a sharp, warm, and professional appointment booking assistant calling on behalf of {business_name}.
+
+Your single goal: book a {service_type} appointment for {lead_name}.
+
+The moment the call connects, speak immediately. Open with: "Hi, am I speaking with {lead_name}?"
+
+[Edit this prompt to customize agent behavior...]`;
+
+  async function loadPrompt() {
+    try {
+      const r = await api('/settings/SYSTEM_PROMPT');
+      document.getElementById('prompt-editor').value = r.value || DEFAULT_PROMPT;
+    } catch (e) {
+      document.getElementById('prompt-editor').value = DEFAULT_PROMPT;
+    }
+  }
+
+  async function savePrompt() {
+    const val = document.getElementById('prompt-editor').value;
+    await api('/settings/SYSTEM_PROMPT', { method: 'POST', body: JSON.stringify({ value: val }) });
+    toast('Prompt saved!');
+  }
+
+  function resetPrompt() {
+    if (confirm('Reset to default prompt?')) {
+      document.getElementById('prompt-editor').value = DEFAULT_PROMPT;
+    }
+  }
+
+  // ─── Agent Profiles ───────────────────────────────────────────────
+  async function loadProfiles() {
+    try {
+      const profiles = await api('/agent-profiles');
+      const grid = document.getElementById('profiles-grid');
+      if (!profiles.length) {
+        grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1"><div class="empty-icon">🎭</div><p>No profiles yet. Create one to assign custom voices and prompts to campaigns.</p></div>`;
+        return;
+      }
+      grid.innerHTML = profiles.map(p => `
+        <div class="card" style="position:relative">
+          ${p.is_default ? '<span class="badge badge-purple" style="position:absolute;top:12px;right:12px">Default</span>' : ''}
+          <div style="font-size:18px;margin-bottom:8px">🎭</div>
+          <div style="font-weight:700;font-size:15px;margin-bottom:4px">${p.name}</div>
+          <div style="font-size:12px;color:var(--text3);margin-bottom:12px">Voice: ${p.voice} | Model: ${p.model.split('-').slice(0,3).join('-')}</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            ${!p.is_default ? `<button class="btn btn-secondary btn-sm" onclick="setDefaultProfile('${p.id}')">Set Default</button>` : ''}
+            <button class="btn btn-danger btn-sm" onclick="deleteProfile('${p.id}')">Delete</button>
+          </div>
+        </div>
+      `).join('');
+    } catch (e) { toast('Load profiles failed', 'error'); }
+  }
+
+  async function loadProfilesIntoSelects() {
+    try {
+      const profiles = await api('/agent-profiles');
+      const selects = ['call-profile', 'csv-profile', 'c-profile'];
+      selects.forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        const cur = el.value;
+        el.innerHTML = `<option value="">Default</option>` +
+          profiles.map(p => `<option value="${p.id}" ${p.is_default ? 'selected' : ''}>${p.name}</option>`).join('');
+        if (cur) el.value = cur;
+      });
+    } catch (e) { /* silent */ }
+  }
+
+  function openNewProfileModal() {
+    document.getElementById('modal-profile').classList.add('open');
+  }
+
+  async function createProfile() {
+    const name = document.getElementById('p-name').value.trim();
+    if (!name) { toast('Name required', 'error'); return; }
+    try {
+      await api('/agent-profiles', {
+        method: 'POST',
+        body: JSON.stringify({
+          name,
+          voice: document.getElementById('p-voice').value,
+          model: document.getElementById('p-model').value,
+          system_prompt: document.getElementById('p-prompt').value || null,
+          is_default: document.getElementById('p-default').checked,
+        }),
+      });
+      toast('Profile created!');
+      closeModal('modal-profile');
+      loadProfiles();
+    } catch (e) { toast('Error: ' + e.message, 'error'); }
+  }
+
+  async function setDefaultProfile(id) {
+    await api(`/agent-profiles/${id}/set-default`, { method: 'POST' });
+    toast('Default profile updated'); loadProfiles();
+  }
+
+  async function deleteProfile(id) {
+    if (!confirm('Delete profile?')) return;
+    await api(`/agent-profiles/${id}`, { method: 'DELETE' });
+    toast('Deleted'); loadProfiles();
+  }
+
+  // ─── Settings ─────────────────────────────────────────────────────
+  const SETTINGS_GROUPS = [
+    {
+      label: 'LiveKit (Voice Orchestration)',
+      keys: ['LIVEKIT_URL', 'LIVEKIT_API_KEY', 'LIVEKIT_API_SECRET'],
+    },
+    {
+      label: 'Google Gemini AI',
+      keys: ['GOOGLE_API_KEY', 'GEMINI_MODEL', 'GEMINI_TTS_VOICE', 'USE_GEMINI_REALTIME'],
+    },
+    {
+      label: 'Vobiz SIP Telephony',
+      keys: ['VOBIZ_SIP_DOMAIN', 'VOBIZ_USERNAME', 'VOBIZ_PASSWORD', 'VOBIZ_OUTBOUND_NUMBER', 'OUTBOUND_TRUNK_ID', 'DEFAULT_TRANSFER_NUMBER'],
+    },
+    {
+      label: 'Supabase Database',
+      keys: ['SUPABASE_URL', 'SUPABASE_SERVICE_KEY'],
+    },
+    {
+      label: 'S3 / Recording Storage (Optional)',
+      keys: ['S3_ACCESS_KEY_ID', 'S3_SECRET_ACCESS_KEY', 'S3_ENDPOINT_URL', 'S3_REGION', 'S3_BUCKET'],
+    },
+    {
+      label: 'Cal.com (Optional)',
+      keys: ['CALCOM_API_KEY', 'CALCOM_EVENT_TYPE_ID', 'CALCOM_TIMEZONE'],
+    },
+    {
+      label: 'Twilio SMS (Optional)',
+      keys: ['TWILIO_ACCOUNT_SID', 'TWILIO_AUTH_TOKEN', 'TWILIO_FROM_NUMBER'],
+    },
+    {
+      label: 'Deepgram STT Fallback (Optional)',
+      keys: ['DEEPGRAM_API_KEY'],
+    },
+  ];
+
+  const SENSITIVE = new Set(['LIVEKIT_API_KEY','LIVEKIT_API_SECRET','GOOGLE_API_KEY','VOBIZ_PASSWORD','TWILIO_AUTH_TOKEN','SUPABASE_SERVICE_KEY','S3_SECRET_ACCESS_KEY','CALCOM_API_KEY','DEEPGRAM_API_KEY']);
+  let _settingsData = {};
+
+  async function loadSettings() {
+    try {
+      _settingsData = await api('/settings');
+      renderSettings();
+    } catch (e) { toast('Load settings failed', 'error'); }
+  }
+
+  function renderSettings() {
+    const container = document.getElementById('settings-container');
+    container.innerHTML = SETTINGS_GROUPS.map(group => `
+      <div class="settings-group">
+        <div class="settings-group-header">${group.label}</div>
+        ${group.keys.map(k => {
+          const info = _settingsData[k] || { value: '', configured: false };
+          const isSecret = SENSITIVE.has(k);
+          return `<div class="settings-row">
+            <div class="settings-key">${k}</div>
+            <div class="settings-value">
+              <input class="form-control" 
+                id="setting-${k}" 
+                type="${isSecret ? 'password' : 'text'}" 
+                value="${isSecret ? '' : (info.value || '')}"
+                placeholder="${isSecret ? (info.configured ? '••••••••••••••••' : 'Not set') : 'Enter value...'}" />
+            </div>
+            <div class="settings-status">
+              ${info.configured
+                ? '<span class="badge badge-green">✓ Set</span>'
+                : '<span class="badge badge-gray">Not set</span>'}
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+    `).join('');
+  }
+
+  async function saveSettings() {
+    const data = {};
+    SETTINGS_GROUPS.forEach(g => g.keys.forEach(k => {
+      const el = document.getElementById(`setting-${k}`);
+      if (el && el.value.trim()) data[k] = el.value.trim();
+    }));
+    try {
+      await api('/settings', { method: 'POST', body: JSON.stringify({ settings: data }) });
+      toast('Settings saved! Restart agent to apply.');
+      loadSettings();
+    } catch (e) { toast('Save failed: ' + e.message, 'error'); }
+  }
+
+  // ─── Modal helpers ────────────────────────────────────────────────
+  function closeModal(id) {
+    document.getElementById(id).classList.remove('open');
+  }
+
+  document.addEventListener('click', e => {
+    if (e.target.classList.contains('modal-overlay')) {
+      e.target.classList.remove('open');
+    }
+  });
+
+  // ─── Refresh all ──────────────────────────────────────────────────
+  function refreshAll() {
+    const active = document.querySelector('.page.active');
+    if (!active) return;
+    const id = active.id.replace('page-', '');
+    showPage(id);
+    toast('Refreshed', 'info');
+  }
+
+  // ─── Health check ────────────────────────────────────────────────
+  async function checkHealth() {
+    try {
+      const h = await api('/health');
+      document.getElementById('status-dot').style.background = 'var(--green)';
+      document.getElementById('status-label').textContent = 'Connected';
+    } catch {
+      document.getElementById('status-dot').style.background = 'var(--red)';
+      document.getElementById('status-label').textContent = 'Offline';
+    }
+  }
+
+  // ─── Init ─────────────────────────────────────────────────────────
+  window.addEventListener('DOMContentLoaded', () => {
+    checkHealth();
+    loadDashboard();
+    loadProfilesIntoSelects();
+    setInterval(checkHealth, 30000);
+  });
+</script>
+</body>
+</html>
