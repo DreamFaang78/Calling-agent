@@ -262,9 +262,8 @@ async def entrypoint(ctx: agents.JobContext) -> None:
             realtime_model = _get_google_realtime_model(voice=voice, model=model)
             session = AgentSession(
                 llm=realtime_model,
-                tools=tools_ctx,
             )
-            agent = Agent(instructions=system_prompt)
+            agent = Agent(instructions=system_prompt, tools=tool_list)
             await session.start(
                 agent=agent,
                 room=ctx.room,
@@ -286,9 +285,8 @@ async def entrypoint(ctx: agents.JobContext) -> None:
                 llm=llm_model,
                 tts=tts,
                 vad=vad,
-                tools=tools_ctx,
             )
-            agent = Agent(instructions=system_prompt)
+            agent = Agent(instructions=system_prompt, tools=tool_list)
             await session.start(
                 agent=agent,
                 room=ctx.room,
