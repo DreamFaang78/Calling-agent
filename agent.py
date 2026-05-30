@@ -58,8 +58,10 @@ async def _log(level: str, msg: str, detail: str = "") -> None:
 def load_db_settings_to_env() -> None:
     """Load Supabase settings table into os.environ before worker starts."""
     url = os.getenv("SUPABASE_URL", "")
-    key = os.getenv("SUPABASE_SERVICE_KEY", "")
+    # Support both key names for compatibility (SUPABASE_SERVICE_ROLE_KEY is canonical)
+    key = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "") or os.getenv("SUPABASE_SERVICE_KEY", "")
     if not url or not key:
+        logger.warning("SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not set — skipping settings load")
         return
     try:
         from supabase import create_client
@@ -68,19 +70,60 @@ def load_db_settings_to_env() -> None:
         for row in (result.data or []):
             if row.get("value"):
                 os.environ[row["key"]] = row["value"]
+        logger.info("Loaded %d settings from Supabase", len(result.data or []))
     except Exception as exc:
         logger.warning("Could not load settings from Supabase: %s", exc)
 
 
 # ── Google Gemini Realtime (Live API) plugin import ───────────────────────────
+# Uses Google AI Studio key (GOOGLE_API_KEY) — NOT Vertex AI credentials.
+# Supported models: gemini-2.5-flash-native-audio-preview, gemini-2.0-flash-live-001
+# Full list: https://docs.livekit.io/agents/integrations/google/
 
 def _get_google_realtime_model(voice: str = None, model: str = None):
-    """Import and construct the Google Gemini multimodal-live model."""
+    """Import and construct the Google Gemini multimodal-live model for Google AI Studio.
+
+    Uses GOOGLE_API_KEY (from aistudio.google.com) — not Vertex AI.
+    The livekit-plugins-google >= 1.0 exposes RealtimeModel directly under
+    livekit.plugins.google.realtime (no longer under .beta).
+    """
     chosen_voice = voice or os.getenv("GEMINI_TTS_VOICE", "Aoede")
-    chosen_model = model or os.getenv("GEMINI_MODEL", "gemini-3.1-flash-live-preview")
+    # Default to gemini-2.5-flash-native-audio-preview — best AI Studio live model
+    chosen_model = model or os.getenv("GEMINI_MODEL", "gemini-2.5-flash-native-audio-preview")
     api_key = os.getenv("GOOGLE_API_KEY", "")
 
-    # Try livekit-plugins-google realtime model
+    if not api_key:
+        raise RuntimeError(
+            "GOOGLE_API_KEY is not set. Get your key from https://aistudio.google.com/app/apikey "
+            "and add it to .env or the Supabase settings table."
+        )
+
+    logger.info("Initializing Gemini Live model: %s (voice=%s)", chosen_model, chosen_voice)
+
+    # ── Attempt 1: Modern API — livekit-plugins-google >= 1.0 ────────────────
+    # Path: livekit.plugins.google.realtime.RealtimeModel
+    try:
+        from livekit.plugins.google import realtime as google_realtime
+        return google_realtime.RealtimeModel(
+            model=chosen_model,
+            voice=chosen_voice,
+            api_key=api_key,
+        )
+    except (ImportError, AttributeError):
+        pass
+
+    # ── Attempt 2: Direct class import ───────────────────────────────────────
+    try:
+        from livekit.plugins.google.realtime import RealtimeModel
+        return RealtimeModel(
+            model=chosen_model,
+            voice=chosen_voice,
+            api_key=api_key,
+        )
+    except (ImportError, AttributeError):
+        pass
+
+    # ── Attempt 3: Legacy beta path (older plugin versions) ──────────────────
     try:
         from livekit.plugins.google import beta as google_beta
         return google_beta.realtime.RealtimeModel(
@@ -92,26 +135,16 @@ def _get_google_realtime_model(voice: str = None, model: str = None):
         pass
 
     try:
-        from livekit.plugins.google.beta.realtime import RealtimeModel
+        from livekit.plugins.google.beta.realtime import RealtimeModel  # type: ignore
         return RealtimeModel(
-            model=chosen_model,
-            voice=chosen_voice,
-            api_key=api_key,
-        )
-    except (ImportError, AttributeError):
-        pass
-
-    try:
-        from livekit.plugins import google as google_plugin
-        return google_plugin.beta.realtime.RealtimeModel(
             model=chosen_model,
             voice=chosen_voice,
             api_key=api_key,
         )
     except (ImportError, AttributeError) as exc:
         raise RuntimeError(
-            "livekit-plugins-google with realtime support not available. "
-            "Install: pip install livekit-plugins-google>=1.0.0"
+            "livekit-plugins-google with Gemini Live (realtime) support is not available. "
+            "Run: pip install -U 'livekit-plugins-google>=1.0.0'"
         ) from exc
 
 

@@ -1,18 +1,26 @@
+# ── LiveKit core ──────────────────────────────────────────────────────────────
 livekit-agents>=1.0.0
 livekit-api>=0.8.0
+# Google Gemini Live (AI Studio) — handles all Gemini API calls via google-genai
+# Do NOT add google-generativeai; it conflicts with the bundled google-genai.
 livekit-plugins-google>=1.0.0
 livekit-plugins-deepgram>=0.8.0
 livekit-plugins-silero>=0.8.0
 livekit-plugins-noise-cancellation
+
+# ── API / web server ──────────────────────────────────────────────────────────
 fastapi>=0.110.0
 uvicorn[standard]>=0.29.0
 python-multipart>=0.0.9
+
+# ── Database / integrations ───────────────────────────────────────────────────
 supabase>=2.0.0
 httpx>=0.25.0
 python-dotenv>=1.0.0
 apscheduler>=3.10.0
-google-api-python-client>=2.100.0
-google-auth-oauthlib>=1.0.0
 twilio>=8.0.0
 certifi>=2024.0.0
-google-generativeai>=0.8.0
+
+# ── Google Auth (OAuth / service-account helpers only) ───────────────────────
+google-api-python-client>=2.100.0
+google-auth-oauthlib>=1.0.0
