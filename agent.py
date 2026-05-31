@@ -272,9 +272,19 @@ async def entrypoint(ctx: agents.JobContext) -> None:
                 ),
             )
             await _log("info", "Gemini Live realtime session started")
-            await session.wait()
+            # Kick the agent to speak first (prompt requires speaking immediately)
+            try:
+                session.generate_reply()
+            except Exception as exc:
+                await _log("warning", f"generate_reply failed: {exc}")
+            await _wait_until_call_ends(ctx)
         except Exception as exc:
             await _log("error", f"Realtime session error: {exc}", str(exc))
+        finally:
+            try:
+                await session.aclose()
+            except Exception:
+                pass
     else:
         # Pipeline fallback
         try:
@@ -295,9 +305,53 @@ async def entrypoint(ctx: agents.JobContext) -> None:
                 ),
             )
             await _log("info", "Pipeline (STT+LLM+TTS) session started")
-            await session.wait()
+            try:
+                session.generate_reply()
+            except Exception as exc:
+                await _log("warning", f"generate_reply failed: {exc}")
+            await _wait_until_call_ends(ctx)
         except Exception as exc:
             await _log("error", f"Pipeline session error: {exc}", str(exc))
+        finally:
+            try:
+                await session.aclose()
+            except Exception:
+                pass
+
+
+async def _wait_until_call_ends(ctx: agents.JobContext) -> None:
+    """Block until the remote (SIP) participant disconnects or the room closes.
+
+    Replaces the old session.wait() call, which does not exist in
+    livekit-agents 1.x. Keeps the agent process alive for the duration of the
+    call so the conversation can actually happen.
+    """
+    done = asyncio.Event()
+
+    def _on_disconnect(*_args) -> None:
+        done.set()
+
+    ctx.room.on("participant_disconnected", _on_disconnect)
+    ctx.room.on("disconnected", _on_disconnect)
+
+    try:
+        # If there are already no remote participants, end promptly.
+        while not done.is_set():
+            if len(ctx.room.remote_participants) == 0:
+                # Give a brief grace period in case the SIP participant is mid-join
+                await asyncio.sleep(1.0)
+                if len(ctx.room.remote_participants) == 0:
+                    break
+            try:
+                await asyncio.wait_for(done.wait(), timeout=2.0)
+            except asyncio.TimeoutError:
+                continue
+    finally:
+        try:
+            ctx.room.off("participant_disconnected", _on_disconnect)
+            ctx.room.off("disconnected", _on_disconnect)
+        except Exception:
+            pass
 
 
 async def _start_recording(ctx: agents.JobContext, phone_number: Optional[str]) -> Optional[str]:
