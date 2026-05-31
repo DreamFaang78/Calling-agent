@@ -77,7 +77,7 @@ def load_db_settings_to_env() -> None:
 
 # ── Google Gemini Realtime (Live API) plugin import ───────────────────────────
 # Uses Google AI Studio key (GOOGLE_API_KEY) — NOT Vertex AI credentials.
-# Supported models: gemini-2.5-flash-native-audio-preview, gemini-2.0-flash-live-001
+# Supported live models (verified via models.list): gemini-2.5-flash-native-audio-latest, gemini-3.1-flash-live-preview
 # Full list: https://docs.livekit.io/agents/integrations/google/
 
 def _get_google_realtime_model(voice: str = None, model: str = None):
@@ -88,8 +88,8 @@ def _get_google_realtime_model(voice: str = None, model: str = None):
     livekit.plugins.google.realtime (no longer under .beta).
     """
     chosen_voice = voice or os.getenv("GEMINI_TTS_VOICE", "Aoede")
-    # Default to gemini-2.5-flash-native-audio-preview — best AI Studio live model
-    chosen_model = model or os.getenv("GEMINI_MODEL", "gemini-2.5-flash-native-audio-preview")
+    # Default to gemini-2.5-flash-native-audio-latest — verified live (bidiGenerateContent) model
+    chosen_model = model or os.getenv("GEMINI_MODEL", "gemini-2.5-flash-native-audio-latest")
     api_key = os.getenv("GOOGLE_API_KEY", "")
 
     if not api_key:

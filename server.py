@@ -105,7 +105,7 @@ class NotesUpdate(BaseModel):
 class AgentProfileCreate(BaseModel):
     name: str
     voice: str = "Aoede"
-    model: str = "gemini-2.5-flash-native-audio-preview"
+    model: str = "gemini-2.5-flash-native-audio-latest"
     system_prompt: Optional[str] = None
     enabled_tools: str = "[]"
     is_default: bool = False
