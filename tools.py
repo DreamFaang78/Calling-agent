@@ -227,26 +227,35 @@ class AppointmentTools(llm.ToolContext):
             return "Could not save detail."
 
     async def _compress_memories(self) -> None:
-        """Use Gemini Flash to compress multiple memories into concise bullets."""
+        """Use Gemini Flash to compress multiple memories into concise bullets.
+
+        Uses the bundled google-genai SDK (the async client). Do NOT use the
+        deprecated google-generativeai package — it is not installed and
+        conflicts with google-genai (see AGENTS.md).
+        """
         try:
             memories = await get_contact_memory(self.phone_number)
             if len(memories) < 5:
                 return
-            import google.generativeai as genai
             api_key = os.getenv("GOOGLE_API_KEY", "")
             if not api_key:
                 return
-            genai.configure(api_key=api_key)
-            model = genai.GenerativeModel("gemini-2.0-flash")
+            from google import genai
+            client = genai.Client(api_key=api_key)
+            # Use a text model here, NOT the realtime native-audio model in GEMINI_MODEL.
+            # gemini-2.0-flash is retired for new accounts; default to 2.5-flash.
+            model = os.getenv("MEMORY_COMPRESSION_MODEL", "gemini-2.5-flash")
             bullet_list = "\n".join(f"- {m['insight']}" for m in memories)
             prompt = (
-                f"Compress these notes about a sales contact into 3-5 concise bullets. "
+                "Compress these notes about a sales contact into 3-5 concise bullets. "
                 f"Keep all key facts.\n\n{bullet_list}"
             )
-            loop = asyncio.get_event_loop()
-            response = await loop.run_in_executor(None, lambda: model.generate_content(prompt))
-            if response.text.strip():
-                await compress_contact_memory(self.phone_number, response.text.strip())
+            response = await client.aio.models.generate_content(
+                model=model, contents=prompt
+            )
+            text = (response.text or "").strip()
+            if text:
+                await compress_contact_memory(self.phone_number, text)
         except Exception as exc:
             logger.warning("Memory compression failed: %s", exc)
 

@@ -155,7 +155,7 @@ def _get_pipeline_model():
         from livekit.plugins.google import LLM as GoogleLLM
         stt = deepgram.STT(api_key=os.getenv("DEEPGRAM_API_KEY", ""))
         llm_model = GoogleLLM(
-            model=os.getenv("GEMINI_MODEL", "gemini-2.0-flash"),
+            model=os.getenv("GEMINI_PIPELINE_MODEL", "gemini-2.5-flash"),
             api_key=os.getenv("GOOGLE_API_KEY", ""),
         )
         tts = lk_openai.TTS()
