@@ -100,6 +100,51 @@ def load_db_settings_to_env() -> None:
 # Supported live models (verified via models.list): gemini-2.5-flash-native-audio-latest, gemini-3.1-flash-live-preview
 # Full list: https://docs.livekit.io/agents/integrations/google/
 
+# Live (bidiGenerateContent) models verified to exist via models.list.
+VALID_LIVE_MODELS = {
+    "gemini-2.5-flash-native-audio-latest",
+    "gemini-2.5-flash-native-audio-preview-09-2025",
+    "gemini-2.5-flash-native-audio-preview-12-2025",
+    "gemini-3.1-flash-live-preview",
+}
+# Known-bad / stale names that have appeared in env or the settings table,
+# mapped to the closest valid live model. These 404 on bidiGenerateContent.
+LIVE_MODEL_ALIASES = {
+    "gemini-2.5-flash-native-audio-preview": "gemini-2.5-flash-native-audio-latest",
+    "gemini-2.5-flash-native-audio": "gemini-2.5-flash-native-audio-latest",
+    "gemini-2.0-flash": "gemini-2.5-flash-native-audio-latest",
+    "gemini-3.1-flash-live-preview-latest": "gemini-3.1-flash-live-preview",
+}
+_FALLBACK_LIVE_MODEL = "gemini-2.5-flash-native-audio-latest"
+
+
+def _normalize_live_model(name: str) -> str:
+    """Map stale/invalid live model names to a valid one.
+
+    Guards against a bad GEMINI_MODEL value (e.g. the non-existent
+    '...-native-audio-preview') in env or the Supabase settings table silently
+    404-ing every call. Returns a model known to support bidiGenerateContent.
+    """
+    name = (name or "").strip()
+    if not name:
+        return _FALLBACK_LIVE_MODEL
+    if name in VALID_LIVE_MODELS:
+        return name
+    if name in LIVE_MODEL_ALIASES:
+        corrected = LIVE_MODEL_ALIASES[name]
+        logger.warning(
+            "GEMINI_MODEL '%s' is not a valid live model; using '%s' instead.",
+            name, corrected,
+        )
+        return corrected
+    logger.warning(
+        "GEMINI_MODEL '%s' is not in the known live-model list; falling back to '%s'. "
+        "Valid: %s",
+        name, _FALLBACK_LIVE_MODEL, ", ".join(sorted(VALID_LIVE_MODELS)),
+    )
+    return _FALLBACK_LIVE_MODEL
+
+
 def _get_google_realtime_model(voice: str = None, model: str = None):
     """Import and construct the Google Gemini multimodal-live model for Google AI Studio.
 
@@ -110,6 +155,7 @@ def _get_google_realtime_model(voice: str = None, model: str = None):
     chosen_voice = voice or os.getenv("GEMINI_TTS_VOICE", "Aoede")
     # Default to gemini-2.5-flash-native-audio-latest — verified live (bidiGenerateContent) model
     chosen_model = model or os.getenv("GEMINI_MODEL", "gemini-2.5-flash-native-audio-latest")
+    chosen_model = _normalize_live_model(chosen_model)
     api_key = os.getenv("GOOGLE_API_KEY", "")
 
     if not api_key:
