@@ -53,13 +53,22 @@ class GreetingAgent(Agent):
     """
 
     async def on_enter(self) -> None:
+        # Log to the DB-backed error_logs table so this shows in the dashboard
+        # Live Logs (logger.* only goes to container stdout, which the dashboard
+        # does not display). This is how we see whether the greeting actually
+        # fires on a real call.
+        await _log("info", "on_enter: agent active, requesting opening greeting")
         try:
-            # generate_reply() returns a SpeechHandle; the system prompt already
-            # instructs the agent to greet immediately, so no extra instructions
-            # are needed here.
-            self.session.generate_reply()
-        except Exception as exc:  # never let the greeting kill the call
-            logger.warning("on_enter greeting failed: %s", exc)
+            handle = self.session.generate_reply()
+            # Await the speech handle if the framework returns an awaitable one,
+            # so we surface any error raised while producing the greeting.
+            if hasattr(handle, "__await__"):
+                await handle
+            await _log("info", "on_enter: generate_reply dispatched OK")
+        except Exception as exc:
+            # Surface the real failure to the dashboard instead of silently
+            # leaving the call dead-air.
+            await _log("error", f"on_enter greeting failed: {exc}", repr(exc))
 
 
 async def _log(level: str, msg: str, detail: str = "") -> None:
