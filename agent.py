@@ -42,6 +42,26 @@ logger = logging.getLogger("outbound-agent")
 SIP_DOMAIN = os.getenv("VOBIZ_SIP_DOMAIN", "")
 
 
+class GreetingAgent(Agent):
+    """Agent that speaks first the moment it becomes active.
+
+    The opening line is triggered from ``on_enter`` rather than right after
+    ``session.start()``. ``on_enter`` is invoked by the framework only once the
+    AgentSession is fully running and this agent is the active one, which avoids
+    the "AgentSession isn't running" race that happens when generate_reply() is
+    called too early.
+    """
+
+    async def on_enter(self) -> None:
+        try:
+            # generate_reply() returns a SpeechHandle; the system prompt already
+            # instructs the agent to greet immediately, so no extra instructions
+            # are needed here.
+            self.session.generate_reply()
+        except Exception as exc:  # never let the greeting kill the call
+            logger.warning("on_enter greeting failed: %s", exc)
+
+
 async def _log(level: str, msg: str, detail: str = "") -> None:
     if level == "info":
         logger.info(msg)
@@ -263,7 +283,7 @@ async def entrypoint(ctx: agents.JobContext) -> None:
             session = AgentSession(
                 llm=realtime_model,
             )
-            agent = Agent(instructions=system_prompt, tools=tool_list)
+            agent = GreetingAgent(instructions=system_prompt, tools=tool_list)
             await session.start(
                 agent=agent,
                 room=ctx.room,
@@ -272,11 +292,8 @@ async def entrypoint(ctx: agents.JobContext) -> None:
                 ),
             )
             await _log("info", "Gemini Live realtime session started")
-            # Kick the agent to speak first (prompt requires speaking immediately)
-            try:
-                session.generate_reply()
-            except Exception as exc:
-                await _log("warning", f"generate_reply failed: {exc}")
+            # The agent greets from GreetingAgent.on_enter once the session is
+            # actually running — no premature generate_reply() here.
             await _wait_until_call_ends(ctx)
         except Exception as exc:
             await _log("error", f"Realtime session error: {exc}", str(exc))
@@ -296,7 +313,7 @@ async def entrypoint(ctx: agents.JobContext) -> None:
                 tts=tts,
                 vad=vad,
             )
-            agent = Agent(instructions=system_prompt, tools=tool_list)
+            agent = GreetingAgent(instructions=system_prompt, tools=tool_list)
             await session.start(
                 agent=agent,
                 room=ctx.room,
@@ -305,10 +322,8 @@ async def entrypoint(ctx: agents.JobContext) -> None:
                 ),
             )
             await _log("info", "Pipeline (STT+LLM+TTS) session started")
-            try:
-                session.generate_reply()
-            except Exception as exc:
-                await _log("warning", f"generate_reply failed: {exc}")
+            # The agent greets from GreetingAgent.on_enter once the session is
+            # actually running — no premature generate_reply() here.
             await _wait_until_call_ends(ctx)
         except Exception as exc:
             await _log("error", f"Pipeline session error: {exc}", str(exc))
