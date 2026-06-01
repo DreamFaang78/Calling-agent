@@ -12,3 +12,8 @@ node_modules/
 dist/
 build/
 .DS_Store
+
+# Local diagnostic / fix scripts — contain hardcoded API keys, never commit
+diag_key_check.py
+diag_startup_sim.py
+fix_settings.py
