@@ -76,11 +76,28 @@ def build_prompt(
 ) -> str:
     """Interpolate lead/business details into the prompt template."""
     template = custom_prompt if custom_prompt else DEFAULT_SYSTEM_PROMPT
+    
+    # Inject current datetime context so LLM knows what "tomorrow" is
+    import os
+    from datetime import datetime
     try:
-        return template.format(
+        from zoneinfo import ZoneInfo
+        tz_str = os.getenv("CALCOM_TIMEZONE", "America/Toronto")
+        tz = ZoneInfo(tz_str)
+    except Exception:
+        from zoneinfo import ZoneInfo
+        tz = ZoneInfo("America/Toronto")
+        
+    current_time_str = datetime.now(tz).strftime("%A, %B %d, %Y at %I:%M %p %Z")
+    time_context = f"━━━ TIMING CONTEXT ━━━\nThe current date and time is {current_time_str}.\nAlways use this exact date/time as your reference point for 'today', 'tomorrow', or day-of-week calculations.\n\n"
+    
+    try:
+        final_prompt = template.format(
             lead_name=lead_name,
             business_name=business_name,
             service_type=service_type,
         )
     except KeyError:
-        return template
+        final_prompt = template
+        
+    return time_context + final_prompt

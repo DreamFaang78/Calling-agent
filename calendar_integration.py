@@ -43,9 +43,17 @@ async def check_google_calendar_availability(date_str: str, time_str: str, durat
         start_dt = datetime.datetime.strptime(f"{date_str} {time_str}", "%Y-%m-%d %H:%M")
         end_dt = start_dt + datetime.timedelta(minutes=duration_minutes)
         
-        # Convert naive datetime to local timezone-aware datetime for accurate API queries
-        start_aware = start_dt.astimezone()
-        end_aware = end_dt.astimezone()
+        # Convert naive datetime to timezone-aware datetime using the business timezone
+        tz_str = os.getenv("CALCOM_TIMEZONE", "America/Toronto")
+        try:
+            from zoneinfo import ZoneInfo
+            tz = ZoneInfo(tz_str)
+        except Exception:
+            from zoneinfo import ZoneInfo
+            tz = ZoneInfo("America/Toronto")
+            
+        start_aware = start_dt.replace(tzinfo=tz)
+        end_aware = end_dt.replace(tzinfo=tz)
         
         start_iso = start_aware.isoformat()
         end_iso = end_aware.isoformat()
