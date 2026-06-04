@@ -5,7 +5,7 @@ from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 
 logger = logging.getLogger("calendar-integration")
-SCOPES = ["https://www.googleapis.com/auth/calendar.readonly"]
+SCOPES = ["https://www.googleapis.com/auth/calendar.events"]
 
 def _get_credentials():
     token_path = os.path.join(os.path.dirname(__file__), "token.json")
@@ -87,3 +87,47 @@ async def check_google_calendar_availability(date_str: str, time_str: str, durat
         logger.error("check_google_calendar_availability failed: %s", exc)
         # Default to True on error so we don't block bookings entirely
         return True
+
+async def insert_google_calendar_event(name: str, phone: str, date_str: str, time_str: str, service: str, duration_minutes: int = 30) -> str:
+    """
+    Creates an event on Google Calendar.
+    Returns the event ID if successful, or raises an Exception.
+    """
+    creds = _get_credentials()
+    if not creds or not creds.valid:
+        logger.warning("No valid token.json found. Skipping Google Calendar insertion.")
+        return ""
+        
+    start_dt = datetime.datetime.strptime(f"{date_str} {time_str}", "%Y-%m-%d %H:%M")
+    end_dt = start_dt + datetime.timedelta(minutes=duration_minutes)
+    
+    tz_str = os.getenv("CALCOM_TIMEZONE", "America/Toronto")
+    try:
+        from zoneinfo import ZoneInfo
+        tz = ZoneInfo(tz_str)
+    except Exception:
+        from zoneinfo import ZoneInfo
+        tz = ZoneInfo("America/Toronto")
+        
+    start_aware = start_dt.replace(tzinfo=tz)
+    end_aware = end_dt.replace(tzinfo=tz)
+    
+    calendar_id = os.getenv("GOOGLE_CALENDAR_ID", "primary")
+    service_api = build('calendar', 'v3', credentials=creds, cache_discovery=False)
+    
+    event_body = {
+        'summary': f'{service} with {name}',
+        'description': f'Phone: {phone}\nService: {service}\nBooked via OutboundAI',
+        'start': {
+            'dateTime': start_aware.isoformat(),
+            'timeZone': tz_str,
+        },
+        'end': {
+            'dateTime': end_aware.isoformat(),
+            'timeZone': tz_str,
+        },
+    }
+    
+    event = service_api.events().insert(calendarId=calendar_id, body=event_body).execute()
+    logger.info("Google Calendar event created: %s", event.get('htmlLink'))
+    return event.get('id', '')

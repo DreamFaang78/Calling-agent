@@ -92,6 +92,14 @@ class AppointmentTools(llm.ToolContext):
         """
         try:
             booking_id = await insert_appointment(name, phone, date, time, service)
+            
+            # Also try to book in Google Calendar
+            try:
+                from calendar_integration import insert_google_calendar_event
+                await insert_google_calendar_event(name, phone, date, time, service)
+            except Exception as cal_exc:
+                logger.error("Failed to insert into Google Calendar: %s", cal_exc)
+                
             return f"Confirmed! Booking ID: {booking_id}. See you on {date} at {time} for {service}."
         except Exception as exc:
             logger.error("book_appointment error: %s", exc)
