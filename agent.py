@@ -59,7 +59,11 @@ class GreetingAgent(Agent):
         # fires on a real call.
         await _log("info", "on_enter: agent active, requesting opening greeting")
         try:
-            handle = self.session.generate_reply()
+            # We must pass an explicit instruction here; otherwise, Gemini Realtime 
+            # will wait for the user to speak first.
+            handle = self.session.generate_reply(
+                instructions="Please say hello and greet the user warmly."
+            )
             # Await the speech handle if the framework returns an awaitable one,
             # so we surface any error raised while producing the greeting.
             if hasattr(handle, "__await__"):

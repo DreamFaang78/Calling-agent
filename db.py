@@ -40,7 +40,7 @@ SENSITIVE_KEYS = {
     "LIVEKIT_API_KEY", "LIVEKIT_API_SECRET", "GOOGLE_API_KEY",
     "VOBIZ_PASSWORD", "TWILIO_AUTH_TOKEN", "SUPABASE_SERVICE_ROLE_KEY",
     "AWS_SECRET_ACCESS_KEY", "S3_SECRET_ACCESS_KEY", "CALCOM_API_KEY",
-    "DEEPGRAM_API_KEY", "GROQ_API_KEY",
+    "DEEPGRAM_API_KEY", "GROQ_API_KEY", "GOOGLE_CALENDAR_ID",
 }
 
 
@@ -82,7 +82,7 @@ async def get_all_settings() -> dict:
         "DEEPGRAM_API_KEY", "TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_FROM_NUMBER",
         "S3_ACCESS_KEY_ID", "S3_SECRET_ACCESS_KEY", "S3_ENDPOINT_URL", "S3_REGION", "S3_BUCKET",
         "CALCOM_API_KEY", "CALCOM_EVENT_TYPE_ID", "CALCOM_TIMEZONE",
-        "ENABLED_TOOLS",
+        "GOOGLE_CALENDAR_ID", "ENABLED_TOOLS",
     ]
     out: dict = {}
     for k in KNOWN_KEYS:
@@ -206,17 +206,49 @@ async def check_slot(date: str, time: str) -> bool:
     return result.data is None
 
 
+async def is_within_business_hours(date: str, time: str) -> bool:
+    """Check if the given date/time falls within Canada business hours (America/Toronto by default).
+    Mon-Fri: 9am-7pm, Sat: 11am-4pm, Sun: 11am-3pm."""
+    try:
+        from zoneinfo import ZoneInfo
+        dt = datetime.strptime(f"{date} {time}", "%Y-%m-%d %H:%M")
+        # Assume the input date/time is intended for the business timezone
+        tz = os.getenv("CALCOM_TIMEZONE", "America/Toronto")
+        try:
+            aware_dt = dt.replace(tzinfo=ZoneInfo(tz))
+        except Exception:
+            aware_dt = dt.replace(tzinfo=ZoneInfo("America/Toronto"))
+            
+        weekday = aware_dt.weekday()
+        hour = aware_dt.hour
+        
+        if 0 <= weekday <= 4:  # Mon-Fri
+            return 9 <= hour < 19
+        elif weekday == 5:     # Saturday
+            return 11 <= hour < 16
+        elif weekday == 6:     # Sunday
+            return 11 <= hour < 15
+        return False
+    except Exception:
+        return False
+
+
 async def get_next_available(date: str, time: str) -> str:
     try:
         dt = datetime.strptime(f"{date} {time}", "%Y-%m-%d %H:%M")
     except ValueError:
         dt = datetime.now().replace(minute=0, second=0, microsecond=0) + timedelta(hours=1)
-    for _ in range(7 * 24):
+    
+    for _ in range(14 * 24):  # Check up to 14 days ahead
         dt += timedelta(hours=1)
-        if 9 <= dt.hour < 18:
-            if await check_slot(dt.strftime("%Y-%m-%d"), dt.strftime("%H:%M")):
-                return f"{dt.strftime('%Y-%m-%d')} at {dt.strftime('%H:%M')}"
-    return "no open slots found in the next 7 days"
+        d_str = dt.strftime("%Y-%m-%d")
+        t_str = dt.strftime("%H:%M")
+        
+        if await is_within_business_hours(d_str, t_str):
+            if await check_slot(d_str, t_str):
+                return f"{d_str} at {t_str}"
+                
+    return "no open slots found in the next 14 days"
 
 
 async def get_all_appointments(date_filter: Optional[str] = None) -> list:

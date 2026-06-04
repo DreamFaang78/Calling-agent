@@ -61,8 +61,22 @@ class AppointmentTools(llm.ToolContext):
         Returns 'available' or 'unavailable: next available slot is <slot>'.
         """
         try:
+            from db import is_within_business_hours
+            if not await is_within_business_hours(date, time):
+                next_slot = await get_next_available(date, time)
+                return f"unavailable: that time is outside our business hours. Next available is {next_slot}"
+
+            # 1. Check Google Calendar API first (if configured)
+            from calendar_integration import check_google_calendar_availability
+            is_free_on_google = await check_google_calendar_availability(date, time)
+            if not is_free_on_google:
+                next_slot = await get_next_available(date, time)
+                return f"unavailable: slot is busy on Google Calendar. Next available is {next_slot}"
+
+            # 2. Check local database
             if await check_slot(date, time):
                 return "available"
+                
             next_slot = await get_next_available(date, time)
             return f"unavailable: next available slot is {next_slot}"
         except Exception as exc:

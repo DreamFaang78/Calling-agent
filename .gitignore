@@ -17,3 +17,7 @@ build/
 diag_key_check.py
 diag_startup_sim.py
 fix_settings.py
+
+credentials.json
+token.json
+auth_google.py

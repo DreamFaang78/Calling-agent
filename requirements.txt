@@ -24,3 +24,7 @@ certifi>=2024.0.0
 # ── Google Auth (OAuth / service-account helpers only) ───────────────────────
 google-api-python-client>=2.100.0
 google-auth-oauthlib>=1.0.0
+
+google-api-python-client
+google-auth-httplib2
+google-auth-oauthlib
