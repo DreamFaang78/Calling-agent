@@ -28,8 +28,9 @@ ALWAYS call check_availability(date, time) before confirming anything.
 If slot unavailable → "That one's taken — how about [next available]?"
 
 STEP 5 — BOOK
-Once lead verbally agrees to date + time:
-1. Call book_appointment(name, phone, date, time, service)
+Before booking, ask: "What type of insurance will you be using?"
+Once lead verbally agrees to date + time AND provides insurance:
+1. Call book_appointment(name, phone, date, time, service, insurance)
 2. Call send_sms_confirmation(phone, "Your {service_type} at {business_name} is confirmed for [date] at [time]. See you then!")
 
 STEP 6 — CLOSE

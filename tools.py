@@ -84,19 +84,19 @@ class AppointmentTools(llm.ToolContext):
             return "Unable to check availability right now — please suggest a date and I will confirm."
 
     @llm.function_tool
-    async def book_appointment(self, name: str, phone: str, date: str, time: str, service: str) -> str:
+    async def book_appointment(self, name: str, phone: str, date: str, time: str, service: str, insurance: str) -> str:
         """
-        Book an appointment after the lead has verbally confirmed date, time, and service.
-        Call ONLY after the lead confirms all details.
-        name: lead's full name | phone: with country code | date: YYYY-MM-DD | time: HH:MM | service: type
+        Book an appointment.
+        Call ONLY after the lead confirms date, time, service, and THEIR INSURANCE TYPE.
+        name: lead's full name | phone: with country code | date: YYYY-MM-DD | time: HH:MM | service: type | insurance: type of insurance (e.g. 'Medicare', 'BlueCross', 'None')
         """
         try:
-            booking_id = await insert_appointment(name, phone, date, time, service)
+            booking_id = await insert_appointment(name, phone, date, time, service, insurance)
             
             # Also try to book in Google Calendar
             try:
                 from calendar_integration import insert_google_calendar_event
-                await insert_google_calendar_event(name, phone, date, time, service)
+                await insert_google_calendar_event(name, phone, date, time, service, insurance)
             except Exception as cal_exc:
                 logger.error("Failed to insert into Google Calendar: %s", cal_exc)
                 

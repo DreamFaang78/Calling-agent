@@ -88,7 +88,7 @@ async def check_google_calendar_availability(date_str: str, time_str: str, durat
         # Default to True on error so we don't block bookings entirely
         return True
 
-async def insert_google_calendar_event(name: str, phone: str, date_str: str, time_str: str, service: str, duration_minutes: int = 30) -> str:
+async def insert_google_calendar_event(name: str, phone: str, date_str: str, time_str: str, service: str, insurance: str = "", duration_minutes: int = 30) -> str:
     """
     Creates an event on Google Calendar.
     Returns the event ID if successful, or raises an Exception.
@@ -117,7 +117,7 @@ async def insert_google_calendar_event(name: str, phone: str, date_str: str, tim
     
     event_body = {
         'summary': f'{service} with {name}',
-        'description': f'Phone: {phone}\nService: {service}\nBooked via OutboundAI',
+        'description': f'Phone: {phone}\nService: {service}\nInsurance: {insurance}\nBooked via OutboundAI',
         'start': {
             'dateTime': start_aware.isoformat(),
             'timeZone': tz_str,

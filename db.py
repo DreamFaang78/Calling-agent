@@ -183,15 +183,30 @@ async def clear_errors() -> None:
 
 # ── Appointments ──────────────────────────────────────────────────────────────
 
-async def insert_appointment(name: str, phone: str, date: str, time: str, service: str) -> str:
+async def insert_appointment(name: str, phone: str, date: str, time: str, service: str, insurance: str = "") -> str:
     full_id = str(uuid.uuid4())
     booking_id = full_id[:8].upper()
     db = await _adb()
-    await db.table("appointments").insert({
+    
+    row = {
         "id": full_id, "name": name, "phone": phone,
         "date": date, "time": time, "service": service,
         "status": "booked", "created_at": datetime.now().isoformat(),
-    }).execute()
+        "insurance": insurance,
+    }
+    
+    try:
+        await db.table("appointments").insert(row).execute()
+    except Exception as exc:
+        # Fallback if the user forgot to run the schema update for the 'insurance' column
+        if "column" in str(exc).lower() or "insurance" in str(exc).lower():
+            del row["insurance"]
+            await log_error("db", "Schema out of date: missing 'insurance' column. Falling back.", str(exc), "warning")
+            await db.table("appointments").insert(row).execute()
+        else:
+            await log_error("db", "Failed to insert appointment", str(exc), "error")
+            raise exc
+            
     return booking_id
 
 
