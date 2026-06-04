@@ -158,7 +158,7 @@ def _normalize_live_model(name: str) -> str:
     return _FALLBACK_LIVE_MODEL
 
 
-def _get_google_realtime_model(voice: str = None, model: str = None):
+def _get_google_realtime_model(voice: str = None, model: str = None, instructions: str = None):
     """Import and construct the Google Gemini multimodal-live model for Google AI Studio.
 
     Uses GOOGLE_API_KEY (from aistudio.google.com) — not Vertex AI.
@@ -187,6 +187,7 @@ def _get_google_realtime_model(voice: str = None, model: str = None):
             model=chosen_model,
             voice=chosen_voice,
             api_key=api_key,
+            instructions=instructions,
         )
     except (ImportError, AttributeError):
         pass
@@ -198,6 +199,7 @@ def _get_google_realtime_model(voice: str = None, model: str = None):
             model=chosen_model,
             voice=chosen_voice,
             api_key=api_key,
+            instructions=instructions,
         )
     except (ImportError, AttributeError):
         pass
@@ -209,6 +211,7 @@ def _get_google_realtime_model(voice: str = None, model: str = None):
             model=chosen_model,
             voice=chosen_voice,
             api_key=api_key,
+            instructions=instructions,
         )
     except (ImportError, AttributeError):
         pass
@@ -219,6 +222,7 @@ def _get_google_realtime_model(voice: str = None, model: str = None):
             model=chosen_model,
             voice=chosen_voice,
             api_key=api_key,
+            instructions=instructions,
         )
     except (ImportError, AttributeError) as exc:
         raise RuntimeError(
@@ -266,7 +270,8 @@ def _parse_participant_metadata(participant: rtc.RemoteParticipant) -> dict:
 
 async def entrypoint(ctx: agents.JobContext) -> None:
     """Main agent entrypoint — called once per inbound/outbound call."""
-    await ctx.connect()
+    from livekit.agents import AutoSubscribe
+    await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
     await _log("info", f"Agent connected to room: {ctx.room.name}")
 
     # Extract participant metadata (phone, name, profile)
@@ -338,7 +343,7 @@ async def entrypoint(ctx: agents.JobContext) -> None:
 
     if use_realtime:
         try:
-            realtime_model = _get_google_realtime_model(voice=voice, model=model)
+            realtime_model = _get_google_realtime_model(voice=voice, model=model, instructions=system_prompt)
             session = AgentSession(
                 llm=realtime_model,
             )
@@ -346,9 +351,6 @@ async def entrypoint(ctx: agents.JobContext) -> None:
             await session.start(
                 agent=agent,
                 room=ctx.room,
-                room_input_options=RoomInputOptions(
-                    noise_cancellation=noise_cancellation.BVC(),
-                ),
             )
             await _log("info", "Gemini Live realtime session started")
             # The agent greets from GreetingAgent.on_enter once the session is
@@ -376,9 +378,6 @@ async def entrypoint(ctx: agents.JobContext) -> None:
             await session.start(
                 agent=agent,
                 room=ctx.room,
-                room_input_options=RoomInputOptions(
-                    noise_cancellation=noise_cancellation.BVC(),
-                ),
             )
             await _log("info", "Pipeline (STT+LLM+TTS) session started")
             # The agent greets from GreetingAgent.on_enter once the session is
