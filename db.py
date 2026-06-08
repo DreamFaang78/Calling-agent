@@ -214,14 +214,24 @@ async def insert_appointment(name: str, phone: str, date: str, time: str, servic
 
 
 async def check_slot(date: str, time: str) -> bool:
-    """Returns True if slot is available (no existing booking)."""
-    db = await _adb()
-    result = await (
-        db.table("appointments").select("id")
-        .eq("date", date).eq("time", time).eq("status", "booked")
-        .maybe_single().execute()
-    )
-    return result.data is None
+    """Returns True if the slot is free (no existing booking).
+
+    Uses limit(1) rather than maybe_single(): maybe_single() raises in several
+    postgrest versions when ZERO rows match — the normal case for an open slot —
+    and that exception used to bubble up to the caller as "I'm having trouble
+    checking availability". Fail open on any error.
+    """
+    try:
+        db = await _adb()
+        result = await (
+            db.table("appointments").select("id")
+            .eq("date", date).eq("time", time).eq("status", "booked")
+            .limit(1).execute()
+        )
+        return not (result.data or [])
+    except Exception as exc:
+        await log_error("db", "check_slot failed; treating slot as free", str(exc), "warning")
+        return True
 
 
 async def is_within_business_hours(date: str, time: str) -> bool:

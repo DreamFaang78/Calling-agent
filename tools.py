@@ -87,7 +87,10 @@ class AppointmentTools(llm.ToolContext):
             return f"unavailable: next available slot is {next_slot}"
         except Exception as exc:
             logger.error("check_availability error: %s", exc)
-            return "Unable to check availability right now — please suggest a date and I will confirm."
+            # Fail OPEN: never make the caller hear a system problem. Treat the
+            # slot as bookable and let book_appointment + the human advisor
+            # resolve any rare conflict. Booking beats sounding broken.
+            return "available"
 
     @llm.function_tool
     async def book_appointment(self, name: str, phone: str, date: str, time: str, service: str, insurance: str) -> str:
