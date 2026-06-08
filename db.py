@@ -21,7 +21,9 @@ DEFAULTS = {
     "VOBIZ_PASSWORD":          os.getenv("VOBIZ_PASSWORD", ""),
     "VOBIZ_OUTBOUND_NUMBER":   os.getenv("VOBIZ_OUTBOUND_NUMBER", ""),
     "OUTBOUND_TRUNK_ID":       os.getenv("OUTBOUND_TRUNK_ID", ""),
+    "INBOUND_TRUNK_ID":        os.getenv("INBOUND_TRUNK_ID", ""),
     "DEFAULT_TRANSFER_NUMBER": os.getenv("DEFAULT_TRANSFER_NUMBER", ""),
+    "LEAD_ALERT_PHONE_NUMBER": os.getenv("LEAD_ALERT_PHONE_NUMBER", ""),
     "SUPABASE_URL":            os.getenv("SUPABASE_URL", ""),
     "SUPABASE_SERVICE_ROLE_KEY": os.getenv("SUPABASE_SERVICE_ROLE_KEY", ""),
     "DEEPGRAM_API_KEY":        os.getenv("DEEPGRAM_API_KEY", ""),
@@ -78,7 +80,8 @@ async def get_all_settings() -> dict:
         "LIVEKIT_URL", "LIVEKIT_API_KEY", "LIVEKIT_API_SECRET",
         "GOOGLE_API_KEY", "GEMINI_MODEL", "GEMINI_TTS_VOICE", "USE_GEMINI_REALTIME",
         "VOBIZ_SIP_DOMAIN", "VOBIZ_USERNAME", "VOBIZ_PASSWORD",
-        "VOBIZ_OUTBOUND_NUMBER", "OUTBOUND_TRUNK_ID", "DEFAULT_TRANSFER_NUMBER",
+        "VOBIZ_OUTBOUND_NUMBER", "OUTBOUND_TRUNK_ID", "INBOUND_TRUNK_ID",
+        "DEFAULT_TRANSFER_NUMBER", "LEAD_ALERT_PHONE_NUMBER",
         "DEEPGRAM_API_KEY", "TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_FROM_NUMBER",
         "S3_ACCESS_KEY_ID", "S3_SECRET_ACCESS_KEY", "S3_ENDPOINT_URL", "S3_REGION", "S3_BUCKET",
         "CALCOM_API_KEY", "CALCOM_EVENT_TYPE_ID", "CALCOM_TIMEZONE",
@@ -475,6 +478,53 @@ async def compress_contact_memory(phone: str, compressed: str) -> None:
         "id": str(uuid.uuid4()), "phone_number": phone,
         "insight": compressed[:2000], "created_at": datetime.now().isoformat(),
     }).execute()
+
+
+# ── Leads (inbound qualification) ────────────────────────────────────────────
+
+async def insert_lead(
+    phone: str, name: Optional[str] = None, requirement: Optional[str] = None,
+    urgency: Optional[str] = None, budget: Optional[str] = None, timeline: Optional[str] = None,
+    notes: Optional[str] = None, source: str = "inbound", status: str = "new",
+    appointment_id: Optional[str] = None, call_log_id: Optional[str] = None,
+) -> str:
+    lead_id = str(uuid.uuid4())
+    db = await _adb()
+    row = {
+        "id": lead_id, "phone": phone, "name": name, "requirement": requirement,
+        "urgency": urgency, "budget": budget, "timeline": timeline, "notes": notes,
+        "source": source, "status": status, "appointment_id": appointment_id,
+        "call_log_id": call_log_id, "created_at": datetime.now().isoformat(),
+    }
+    await db.table("leads").insert(row).execute()
+    return lead_id
+
+
+async def get_all_leads(status: Optional[str] = None, limit: int = 200) -> list:
+    db = await _adb()
+    query = db.table("leads").select("*").order("created_at", desc=True).limit(limit)
+    if status:
+        query = query.eq("status", status)
+    result = await query.execute()
+    return result.data or []
+
+
+async def get_lead(lead_id: str) -> Optional[dict]:
+    db = await _adb()
+    result = await db.table("leads").select("*").eq("id", lead_id).maybe_single().execute()
+    return result.data if result else None
+
+
+async def get_leads_by_phone(phone: str) -> list:
+    db = await _adb()
+    result = await db.table("leads").select("*").eq("phone", phone).order("created_at", desc=True).execute()
+    return result.data or []
+
+
+async def update_lead_status(lead_id: str, status: str) -> bool:
+    db = await _adb()
+    result = await db.table("leads").update({"status": status}).eq("id", lead_id).execute()
+    return len(result.data or []) > 0
 
 
 # ── Agent Profiles ────────────────────────────────────────────────────────────

@@ -266,6 +266,24 @@ def _parse_participant_metadata(participant: rtc.RemoteParticipant) -> dict:
     return meta
 
 
+def _detect_call_direction(meta: dict) -> str:
+    """Classify the call as 'inbound' or 'outbound'.
+
+    Outbound calls are always created by server._dispatch_call(), which stamps
+    explicit JSON metadata containing 'lead_name'/'agent_profile_id' keys (even
+    when empty strings). Inbound calls arrive through a LiveKit SIP dispatch
+    rule whose static metadata we control — set call_direction='inbound' there
+    (see setup_inbound_trunk.py). If that tag is missing for any reason, the
+    absence of our outbound dispatch keys is the fallback signal.
+    """
+    direction = (meta.get("call_direction") or meta.get("direction") or "").strip().lower()
+    if direction in ("inbound", "outbound"):
+        return direction
+    if "lead_name" in meta or "agent_profile_id" in meta:
+        return "outbound"
+    return "inbound"
+
+
 # ── LiveKit Agent Entrypoint ──────────────────────────────────────────────────
 
 async def entrypoint(ctx: agents.JobContext) -> None:
@@ -281,6 +299,8 @@ async def entrypoint(ctx: agents.JobContext) -> None:
     custom_prompt: Optional[str] = None
     voice: Optional[str] = None
     model: Optional[str] = None
+    call_direction: str = "outbound"
+    lead_source: str = ""
 
     # Wait for the SIP participant to join
     participant: Optional[rtc.RemoteParticipant] = None
@@ -300,7 +320,13 @@ async def entrypoint(ctx: agents.JobContext) -> None:
         custom_prompt = meta.get("system_prompt")
         voice = meta.get("voice")
         model = meta.get("model")
-        await _log("info", f"Participant: {participant.identity}, phone={phone_number}, lead={lead_name}")
+        call_direction = _detect_call_direction(meta)
+        lead_source = meta.get("source") or meta.get("lead_source") or ""
+        await _log(
+            "info",
+            f"Participant: {participant.identity}, phone={phone_number}, "
+            f"lead={lead_name}, direction={call_direction}",
+        )
 
     # Load agent profile from DB if specified
     if agent_profile_id:
@@ -314,16 +340,23 @@ async def entrypoint(ctx: agents.JobContext) -> None:
         except Exception as exc:
             await _log("warning", f"Could not load agent profile: {exc}")
 
-    # Build system prompt
+    # Build system prompt — inbound calls (e.g. routed in from a Google My
+    # Business listing) get the front-desk qualification persona instead of
+    # the outbound booking script. An explicit per-call/profile custom_prompt
+    # always wins over both.
     system_prompt = build_prompt(
         lead_name=lead_name or "there",
         business_name=os.getenv("BUSINESS_NAME", "our company"),
         service_type=os.getenv("SERVICE_TYPE", "our service"),
         custom_prompt=custom_prompt,
+        call_direction=call_direction,
     )
 
     # Build tool context
-    tools_ctx = AppointmentTools(ctx, phone_number=phone_number, lead_name=lead_name)
+    tools_ctx = AppointmentTools(
+        ctx, phone_number=phone_number, lead_name=lead_name,
+        call_direction=call_direction, lead_source=lead_source,
+    )
     enabled_tools = await get_enabled_tools()
     tool_list = tools_ctx.build_tool_list(enabled_tools)
     tools_ctx._tools = tool_list

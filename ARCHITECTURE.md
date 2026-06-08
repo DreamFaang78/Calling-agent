@@ -6,11 +6,15 @@ This document describes the high-level architecture of OutboundAI and summarizes
 
 ## 1. System Overview
 
-OutboundAI is an **AI-powered outbound voice calling platform**. It integrates several key systems:
-- **FastAPI / server.py (Control Plane):** Manages API endpoints for dialing single numbers, loading CSV batch jobs, monitoring campaign states, handling agent configurations, and serving the static dashboard interface.
-- **LiveKit Agents / agent.py (Voice Brain):** Runs inside the worker process to interface with the LiveKit Room, handle audio processing via WebRTC, and manage AI session lifecycles.
+OutboundAI is an **AI-powered voice calling platform that now runs both directions**:
+it dials out on campaigns, AND it can answer calls routed in from a public business
+number (e.g. one listed on a Google My Business profile), running a front-desk
+qualification conversation instead of a booking script. One worker handles both —
+see §4 "Inbound Channel" below. It integrates several key systems:
+- **FastAPI / server.py (Control Plane):** Manages API endpoints for dialing single numbers, loading CSV batch jobs, monitoring campaign states, handling agent configurations, surfacing captured leads, and serving the static dashboard interface.
+- **LiveKit Agents / agent.py (Voice Brain):** Runs inside the worker process to interface with the LiveKit Room, handle audio processing via WebRTC, detect inbound vs outbound calls, and manage AI session lifecycles.
 - **Google Gemini Live (Realtime Voice Model):** Powering bidirectional speech conversations with low latency.
-- **Supabase (Persistence & Logging):** Storage layer for appointments, call outcomes, custom agent profiles, error logs, and persistent settings.
+- **Supabase (Persistence & Logging):** Storage layer for appointments, call outcomes, **inbound leads**, custom agent profiles, error logs, and persistent settings.
 
 ---
 
@@ -99,3 +103,90 @@ Here are the latest commits that have been successfully fetched and updated in t
 5. **Greeting Hook:** Once the session transitions to the active room context, `GreetingAgent.on_enter()` calls `session.generate_reply()`, prompting immediate audio output to greet the lead.
 6. **Interaction Loop:** The conversational pipeline responds to voice inputs, invoking functions mapped in `tools.py` (e.g. appointment booking, Cal.com scheduling, lookup, or SIP routing transfers).
 7. **Graceful Outro:** On completion, the agent runs `end_call(outcome, reason)`, writes the metadata to the Supabase database, and disconnects.
+
+## 4. Inbound Channel (Google My Business)
+
+The same worker now answers calls too — e.g. the number a business lists on its
+**Google My Business** profile. No second deployment, no second agent: `agent.py`
+(`agent_name="outbound-ai"`) detects the call's *direction* at connection time and
+swaps persona, prompt, and tool wiring accordingly. Setup is one-time and lives in
+[`setup_inbound_trunk.py`](setup_inbound_trunk.py) + [`INBOUND_SETUP.md`](INBOUND_SETUP.md).
+
+```
+Caller dials the GMB-listed number
+        │
+        ▼
+Vobiz (or other SIP provider) forwards the call to LiveKit's SIP URI
+        │
+        ▼
+LiveKit INBOUND_TRUNK_ID + dispatch rule (provisioned once via setup_inbound_trunk.py)
+  → auto-creates a room ("inbound-*")
+  → dispatches "outbound-ai"
+  → stamps participant metadata: {"call_direction": "inbound", "source": "google_my_business"}
+        │
+        ▼
+agent._detect_call_direction() reads that metadata → "inbound"
+        │
+        ▼
+build_prompt(call_direction="inbound") → prompts.INBOUND_SYSTEM_PROMPT
+  (front-desk persona "Priya": "Thanks for calling {business_name}, this is Priya…")
+        │
+        ▼
+Natural discovery conversation (not a script):
+  listen → understand the need → qualify conversationally → offer next step
+        │
+        ├─→ tools.capture_lead(name, requirement, urgency, budget, timeline, notes)
+        │      • always called once something concrete is known about the caller
+        │      • writes a row to the `leads` table via db.insert_lead()
+        │      • fires _alert_owner_of_lead() in the background → SMS to
+        │        LEAD_ALERT_PHONE_NUMBER via the existing Twilio config
+        │
+        └─→ if the caller is ready to commit: the SAME check_availability /
+               book_appointment flow used outbound runs right in this call
+        │
+        ▼
+end_call() logs the outcome as usual; the lead is already persisted
+        │
+        ▼
+Dashboard "Leads" page (GET /leads, GET /leads/{id}, PATCH /leads/{id}/status)
+shows every captured lead — name, requirement, urgency, budget, source, status —
+for human follow-up regardless of whether a booking happened.
+```
+
+### How direction detection and persona-routing work
+- **Stamping:** `setup_inbound_trunk.py` provisions an inbound SIP trunk scoped to the
+  business's number and a SIP dispatch rule whose `room_config.agents[0].metadata` is a
+  static JSON blob: `{"call_direction": "inbound", "source": "<tag>"}`. LiveKit copies
+  that metadata onto every SIP participant created through that trunk — no per-call code
+  needed on the LiveKit side.
+- **Detection:** `agent._detect_call_direction(meta)` reads `call_direction`/`direction`
+  from the parsed participant metadata. If neither key is present (e.g. an older or
+  differently-configured trunk), it falls back to checking for outbound-only keys
+  (`lead_name`, `agent_profile_id`) that `server._dispatch_call()` always stamps —
+  absence of those means the call is treated as inbound.
+- **Routing:** `agent.entrypoint()` threads the detected `call_direction` (and a
+  `lead_source` derived from the metadata's `source` field) through to both
+  `prompts.build_prompt(call_direction=...)` — selecting `INBOUND_SYSTEM_PROMPT` over
+  `DEFAULT_SYSTEM_PROMPT` — and `tools.AppointmentTools(call_direction=..., lead_source=...)`,
+  which exposes `capture_lead` and tags every saved lead with where it came from
+  (`google_my_business` by default, or whatever `--source` the trunk was provisioned with).
+
+### Data model: the `leads` table
+A lightweight, append-mostly table (see `supabase_schema.sql`) distinct from
+`appointments` — it captures *intent* even when no booking happens:
+```
+id, phone, name, requirement, urgency, budget, timeline, notes,
+source ('google_my_business' | 'outbound_campaign' | custom),
+status ('new' | 'contacted' | 'qualified' | 'lost' | ...),
+appointment_id, call_log_id, created_at
+```
+`db.py` exposes `insert_lead`, `get_all_leads(status, limit)`, `get_lead`,
+`get_leads_by_phone`, and `update_lead_status` — all async, all going through the
+shared Supabase client like every other table.
+
+### Multi-channel ready
+Because `source` is just a string tag stamped per dispatch rule, the same mechanism
+scales to more inbound channels later (a Yelp number, a storefront sign QR code, a
+second city's listing, etc.) — just re-run `setup_inbound_trunk.py` with a different
+`--number`/`--source`; leads from each channel stay distinguishable on the **Leads**
+dashboard page without any code changes.

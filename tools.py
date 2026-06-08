@@ -11,6 +11,7 @@ from db import (
     check_slot, get_next_available, insert_appointment, log_call, log_error,
     get_calls_by_phone, get_appointments_by_phone,
     add_contact_memory, get_contact_memory, compress_contact_memory,
+    insert_lead,
 )
 
 logger = logging.getLogger("appointment-tools")
@@ -31,10 +32,14 @@ class AppointmentTools(llm.ToolContext):
         ctx: agents.JobContext,
         phone_number: Optional[str] = None,
         lead_name: Optional[str] = None,
+        call_direction: str = "outbound",
+        lead_source: str = "",
     ):
         self.ctx = ctx
         self.phone_number = phone_number
         self.lead_name = lead_name
+        self.call_direction = call_direction
+        self.lead_source = lead_source or ("google_my_business" if call_direction == "inbound" else "outbound_campaign")
         self._call_start_time = time.time()
         self._sip_domain = os.getenv("VOBIZ_SIP_DOMAIN", "")
         self.recording_url: Optional[str] = None
@@ -46,6 +51,7 @@ class AppointmentTools(llm.ToolContext):
             self.check_availability, self.book_appointment, self.end_call,
             self.transfer_to_human, self.send_sms_confirmation, self.lookup_contact,
             self.remember_details, self.book_calcom, self.cancel_calcom,
+            self.capture_lead,
         ]
         if not enabled:
             return all_methods
@@ -280,6 +286,81 @@ class AppointmentTools(llm.ToolContext):
                 await compress_contact_memory(self.phone_number, text)
         except Exception as exc:
             logger.warning("Memory compression failed: %s", exc)
+
+    @llm.function_tool
+    async def capture_lead(
+        self,
+        name: str,
+        requirement: str,
+        urgency: str = "",
+        budget: str = "",
+        timeline: str = "",
+        notes: str = "",
+    ) -> str:
+        """
+        Save what an inbound caller is looking for — use this once you understand
+        their need, REGARDLESS of whether they book an appointment on this call.
+        This is how the business finds out about the lead and follows up.
+        Call it once per call, after the caller has shared what they need (don't
+        interrogate — just save what naturally comes up in conversation; leave a
+        field blank if it was never mentioned).
+
+        name: caller's name | requirement: what they're looking for/need in their words
+        urgency: how soon they want it (e.g. 'this week', 'just researching', 'ASAP')
+        budget: budget range if they mentioned one (e.g. '$5k-10k', 'not discussed')
+        timeline: when they'd want to start/move forward
+        notes: anything else worth relaying to the team (location, prior provider, etc.)
+        """
+        try:
+            lead_id = await insert_lead(
+                phone=self.phone_number or "unknown",
+                name=name or self.lead_name,
+                requirement=requirement,
+                urgency=urgency,
+                budget=budget,
+                timeline=timeline,
+                notes=notes,
+                source=self.lead_source,
+                status="new",
+            )
+            asyncio.create_task(self._alert_owner_of_lead(name, requirement, urgency, budget))
+            return "Got it, noted down for our team."
+        except Exception as exc:
+            logger.error("capture_lead error: %s", exc)
+            await _log("capture_lead failed", str(exc), "error")
+            return "Noted — though I had trouble saving it, I'll make sure the team still hears about this."
+
+    async def _alert_owner_of_lead(self, name: str, requirement: str, urgency: str, budget: str) -> None:
+        """Text the business owner a one-line summary the moment a lead is captured.
+
+        Reuses the Twilio config already required for send_sms_confirmation —
+        no new integration, just a different recipient (LEAD_ALERT_PHONE_NUMBER).
+        """
+        owner_phone = os.getenv("LEAD_ALERT_PHONE_NUMBER", "")
+        sid = os.getenv("TWILIO_ACCOUNT_SID", "")
+        token = os.getenv("TWILIO_AUTH_TOKEN", "")
+        from_num = os.getenv("TWILIO_FROM_NUMBER", "")
+        if not (owner_phone and sid and token and from_num):
+            return
+        try:
+            who = name or self.lead_name or "Unknown caller"
+            parts = [f"New lead: {who}"]
+            if requirement:
+                parts.append(f"wants {requirement}")
+            if urgency:
+                parts.append(f"urgency: {urgency}")
+            if budget:
+                parts.append(f"budget: {budget}")
+            parts.append(f"Call back: {self.phone_number or 'unknown'}")
+            message = ". ".join(parts)
+            from twilio.rest import Client
+            loop = asyncio.get_event_loop()
+            client = Client(sid, token)
+            await loop.run_in_executor(
+                None, lambda: client.messages.create(body=message[:1500], from_=from_num, to=owner_phone)
+            )
+        except Exception as exc:
+            logger.warning("Lead alert SMS failed: %s", exc)
 
     @llm.function_tool
     async def book_calcom(

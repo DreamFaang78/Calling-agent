@@ -89,3 +89,26 @@ CREATE TABLE IF NOT EXISTS agent_profiles (
     created_at TEXT NOT NULL
 );
 ALTER TABLE agent_profiles DISABLE ROW LEVEL SECURITY;
+
+-- ── Inbound lead qualification ──────────────────────────────────────────
+-- Captures structured intake from inbound callers (e.g. routed in via a
+-- Google My Business phone number) who may or may not book on the call.
+CREATE TABLE IF NOT EXISTS leads (
+    id TEXT PRIMARY KEY,
+    phone TEXT NOT NULL,
+    name TEXT,
+    requirement TEXT,
+    urgency TEXT,
+    budget TEXT,
+    timeline TEXT,
+    notes TEXT,
+    source TEXT NOT NULL DEFAULT 'inbound',
+    status TEXT NOT NULL DEFAULT 'new',
+    appointment_id TEXT,
+    call_log_id TEXT,
+    created_at TEXT NOT NULL
+);
+ALTER TABLE leads DISABLE ROW LEVEL SECURITY;
+CREATE INDEX IF NOT EXISTS idx_leads_phone ON leads (phone);
+CREATE INDEX IF NOT EXISTS idx_leads_status ON leads (status);
+CREATE INDEX IF NOT EXISTS idx_leads_created_at ON leads (created_at DESC);

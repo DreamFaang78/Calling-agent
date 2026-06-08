@@ -770,6 +770,9 @@
   </a>
 
   <div class="nav-section">Intelligence</div>
+  <a class="nav-item" id="nav-leads" onclick="showPage('leads')">
+    <span class="icon">🧲</span> <span>Leads</span>
+  </a>
   <a class="nav-item" id="nav-crm" onclick="showPage('crm')">
     <span class="icon">👥</span> <span>CRM</span>
   </a>
@@ -977,6 +980,32 @@
         <tbody id="appointments-body">
           <tr><td colspan="7"><div class="empty-state"><div class="empty-icon">📅</div><p>No appointments</p></div></td></tr>
         </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ═══════════════ LEADS (inbound qualification) ═══════════════ -->
+  <div class="page" id="page-leads">
+    <div class="section-header">
+      <div class="section-title">🧲 Leads — Captured by the Inbound Agent</div>
+      <div style="display:flex;gap:8px">
+        <select class="form-control" id="leads-status-filter" style="width:160px" onchange="loadLeads()">
+          <option value="">All statuses</option>
+          <option value="new">New</option>
+          <option value="contacted">Contacted</option>
+          <option value="qualified">Qualified</option>
+          <option value="booked">Booked</option>
+          <option value="lost">Lost</option>
+        </select>
+        <button class="btn btn-secondary btn-sm" onclick="loadLeads()">🔄 Refresh</button>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>When</th><th>Name</th><th>Phone</th><th>Looking for</th><th>Urgency</th><th>Budget</th><th>Source</th><th>Status</th><th>Actions</th></tr>
+        </thead>
+        <tbody id="leads-body"></tbody>
       </table>
     </div>
   </div>
@@ -1263,6 +1292,7 @@
 <script>
   const API = '';  // same-origin — server is on :8000, dashboard served from /ui
   let _allContacts = [];
+  let _allLeads = [];
   let _currentMemoryPhone = '';
   let _charts = {};
   let _liveLogInterval = null;
@@ -1280,6 +1310,7 @@
       batch: '📋 Batch CSV Calling',
       campaigns: '🎯 Campaigns',
       appointments: '📅 Appointments',
+      leads: '🧲 Leads',
       crm: '👥 CRM',
       logs: '📜 Call Logs',
       'live-logs': '⚡ Live Logs',
@@ -1294,6 +1325,7 @@
       dashboard: loadDashboard,
       campaigns: loadCampaigns,
       appointments: loadAppointments,
+      leads: loadLeads,
       crm: loadCRM,
       logs: loadCallLogs,
       'live-logs': startLiveLogs,
@@ -1480,7 +1512,7 @@
   }
 
   function statusBadge(s) {
-    const map = { dispatched: 'badge-green', failed: 'badge-red', skipped: 'badge-gray', booked: 'badge-green', active: 'badge-blue', paused: 'badge-orange', completed: 'badge-purple', cancelled: 'badge-red', not_interested: 'badge-red', voicemail: 'badge-gray', no_answer: 'badge-gray', callback_requested: 'badge-orange', wrong_number: 'badge-gray' };
+    const map = { dispatched: 'badge-green', failed: 'badge-red', skipped: 'badge-gray', booked: 'badge-green', active: 'badge-blue', paused: 'badge-orange', completed: 'badge-purple', cancelled: 'badge-red', not_interested: 'badge-red', voicemail: 'badge-gray', no_answer: 'badge-gray', callback_requested: 'badge-orange', wrong_number: 'badge-gray', new: 'badge-blue', contacted: 'badge-orange', qualified: 'badge-green', lost: 'badge-red', lead_captured: 'badge-blue', spam: 'badge-gray' };
     return `<span class="badge ${map[s] || 'badge-gray'}">${s}</span>`;
   }
 
@@ -1619,6 +1651,48 @@
     if (!confirm('Cancel this appointment?')) return;
     await api(`/appointments/${id}`, { method: 'DELETE' });
     toast('Cancelled'); loadAppointments();
+  }
+
+  // ─── Leads (inbound qualification) ───────────────────────────────
+  async function loadLeads() {
+    try {
+      const status = document.getElementById('leads-status-filter').value;
+      _allLeads = await api('/leads' + (status ? `?status=${encodeURIComponent(status)}` : ''));
+      renderLeads(_allLeads);
+    } catch (e) { toast('Leads load failed: ' + e.message, 'error'); }
+  }
+
+  function renderLeads(leads) {
+    const body = document.getElementById('leads-body');
+    if (!leads.length) {
+      body.innerHTML = `<tr><td colspan="9"><div class="empty-state"><div class="empty-icon">🧲</div><p>No leads captured yet — once your inbound number is live, calls qualified by the agent will show up here.</p></div></td></tr>`;
+      return;
+    }
+    const STATUSES = ['new', 'contacted', 'qualified', 'booked', 'lost'];
+    body.innerHTML = leads.map(l => `<tr>
+      <td style="color:var(--text3)">${(l.created_at || '').slice(0,16).replace('T',' ')}</td>
+      <td>${l.name || '—'}</td>
+      <td><span class="phone-chip">${l.phone || '—'}</span></td>
+      <td style="max-width:240px">${l.requirement || '—'}</td>
+      <td>${l.urgency || '—'}</td>
+      <td>${l.budget || '—'}</td>
+      <td style="color:var(--text3)">${l.source || '—'}</td>
+      <td>${statusBadge(l.status || 'new')}</td>
+      <td>
+        <select class="form-control" style="width:130px;font-size:12px" onchange="updateLeadStatus('${l.id}', this.value)">
+          ${STATUSES.map(s => `<option value="${s}" ${s === l.status ? 'selected' : ''}>${s}</option>`).join('')}
+        </select>
+      </td>
+    </tr>`).join('');
+  }
+
+  async function updateLeadStatus(leadId, status) {
+    try {
+      await api(`/leads/${leadId}/status`, { method: 'PATCH', body: JSON.stringify({ status }) });
+      toast('Lead status updated');
+      const lead = _allLeads.find(l => l.id === leadId);
+      if (lead) lead.status = status;
+    } catch (e) { toast('Update failed: ' + e.message, 'error'); }
   }
 
   // ─── CRM ──────────────────────────────────────────────────────────

@@ -34,6 +34,7 @@ from db import (
     get_contact_memory, add_contact_memory,
     get_all_agent_profiles, get_agent_profile, create_agent_profile,
     update_agent_profile, delete_agent_profile, set_default_agent_profile,
+    get_all_leads, get_lead, update_lead_status,
 )
 
 load_dotenv(".env")
@@ -100,6 +101,10 @@ class SettingsUpdate(BaseModel):
 
 class NotesUpdate(BaseModel):
     notes: str
+
+
+class LeadStatusUpdate(BaseModel):
+    status: str
 
 
 class AgentProfileCreate(BaseModel):
@@ -505,6 +510,33 @@ async def add_memory(phone: str, body: dict):
     if not insight:
         raise HTTPException(status_code=400, detail="insight required")
     await add_contact_memory(phone, insight)
+    return {"success": True}
+
+
+# ═══════════════════════════════════════════════════════════════════
+# Leads — captured by the inbound qualification agent (e.g. Google My
+# Business calls). Separate from `appointments`: not every caller books
+# on the spot, but every caller's intent gets recorded here.
+# ═══════════════════════════════════════════════════════════════════
+
+@app.get("/leads")
+async def list_leads(status: Optional[str] = Query(None)):
+    return await get_all_leads(status=status)
+
+
+@app.get("/leads/{lead_id}")
+async def get_lead_endpoint(lead_id: str):
+    lead = await get_lead(lead_id)
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead not found")
+    return lead
+
+
+@app.patch("/leads/{lead_id}/status")
+async def update_lead_status_endpoint(lead_id: str, req: LeadStatusUpdate):
+    ok = await update_lead_status(lead_id, req.status)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Lead not found")
     return {"success": True}
 
 
