@@ -167,22 +167,26 @@ def _build_latency_config() -> dict:
     can be adjusted from the dashboard without a code change. Built defensively:
     if the genai types are missing, the model still constructs on its defaults.
 
-      VAD_SILENCE_MS         end-of-speech wait in ms (default 400; lower=snappier,
-                             too low can cut off a caller who pauses). Raise if
-                             callers get interrupted.
-      VAD_PREFIX_MS          audio captured before speech start (default 60).
+      VAD_SILENCE_MS         end-of-speech wait in ms (default 700; lower=snappier,
+                             too low cuts off a caller who pauses). Raise if
+                             callers still get interrupted.
+      VAD_PREFIX_MS          audio captured before speech start (default 100).
       GEMINI_THINKING_BUDGET set to 0 to disable Gemini "thinking" for faster first
                              audio (opt-in — not every live model honors it).
     """
     extra: dict = {}
     try:
         from google.genai import types as gtypes
-        silence_ms = int(os.getenv("VAD_SILENCE_MS", "400"))
-        prefix_ms = int(os.getenv("VAD_PREFIX_MS", "60"))
+        # Patience: wait ~700ms of silence and use LOW end-of-speech sensitivity so
+        # Priya does NOT cut callers off mid-thought (e.g. while they recall a car
+        # model). Keep START sensitivity HIGH so the caller can still barge in over
+        # her. Raise VAD_SILENCE_MS if she still interrupts; lower it for snappier.
+        silence_ms = int(os.getenv("VAD_SILENCE_MS", "700"))
+        prefix_ms = int(os.getenv("VAD_PREFIX_MS", "100"))
         extra["realtime_input_config"] = gtypes.RealtimeInputConfig(
             automatic_activity_detection=gtypes.AutomaticActivityDetection(
                 start_of_speech_sensitivity=gtypes.StartSensitivity.START_SENSITIVITY_HIGH,
-                end_of_speech_sensitivity=gtypes.EndSensitivity.END_SENSITIVITY_HIGH,
+                end_of_speech_sensitivity=gtypes.EndSensitivity.END_SENSITIVITY_LOW,
                 prefix_padding_ms=prefix_ms,
                 silence_duration_ms=silence_ms,
             )
