@@ -158,6 +158,48 @@ def _normalize_live_model(name: str) -> str:
     return _FALLBACK_LIVE_MODEL
 
 
+def _build_latency_config() -> dict:
+    """Low-latency tuning passed to the realtime model.
+
+    The biggest lever on perceived "answering time" is turn detection — how long
+    Gemini waits after the caller stops speaking before it replies. We set it
+    aggressively and bias toward fast barge-in. All values are env-tunable so they
+    can be adjusted from the dashboard without a code change. Built defensively:
+    if the genai types are missing, the model still constructs on its defaults.
+
+      VAD_SILENCE_MS         end-of-speech wait in ms (default 400; lower=snappier,
+                             too low can cut off a caller who pauses). Raise if
+                             callers get interrupted.
+      VAD_PREFIX_MS          audio captured before speech start (default 60).
+      GEMINI_THINKING_BUDGET set to 0 to disable Gemini "thinking" for faster first
+                             audio (opt-in — not every live model honors it).
+    """
+    extra: dict = {}
+    try:
+        from google.genai import types as gtypes
+        silence_ms = int(os.getenv("VAD_SILENCE_MS", "400"))
+        prefix_ms = int(os.getenv("VAD_PREFIX_MS", "60"))
+        extra["realtime_input_config"] = gtypes.RealtimeInputConfig(
+            automatic_activity_detection=gtypes.AutomaticActivityDetection(
+                start_of_speech_sensitivity=gtypes.StartSensitivity.START_SENSITIVITY_HIGH,
+                end_of_speech_sensitivity=gtypes.EndSensitivity.END_SENSITIVITY_HIGH,
+                prefix_padding_ms=prefix_ms,
+                silence_duration_ms=silence_ms,
+            )
+        )
+    except Exception as exc:
+        logger.warning("Turn-detection tuning unavailable, using model default: %s", exc)
+
+    budget_raw = os.getenv("GEMINI_THINKING_BUDGET", "").strip()
+    if budget_raw != "":
+        try:
+            from google.genai import types as gtypes
+            extra["thinking_config"] = gtypes.ThinkingConfig(thinking_budget=int(budget_raw))
+        except Exception as exc:
+            logger.warning("thinking_config unavailable: %s", exc)
+    return extra
+
+
 def _get_google_realtime_model(voice: str = None, model: str = None, instructions: str = None):
     """Import and construct the Google Gemini multimodal-live model for Google AI Studio.
 
@@ -177,7 +219,11 @@ def _get_google_realtime_model(voice: str = None, model: str = None, instruction
             "and add it to .env or the Supabase settings table."
         )
 
-    logger.info("Initializing Gemini Live model: %s (voice=%s)", chosen_model, chosen_voice)
+    extra = _build_latency_config()
+    logger.info(
+        "Initializing Gemini Live model: %s (voice=%s, latency_tuning=%s)",
+        chosen_model, chosen_voice, list(extra.keys()) or "defaults",
+    )
 
     # ── Attempt 1: Modern API — livekit-plugins-google >= 1.0 ────────────────
     # Path: livekit.plugins.google.realtime.RealtimeModel
@@ -188,6 +234,7 @@ def _get_google_realtime_model(voice: str = None, model: str = None, instruction
             voice=chosen_voice,
             api_key=api_key,
             instructions=instructions,
+            **extra,
         )
     except (ImportError, AttributeError):
         pass
@@ -200,6 +247,7 @@ def _get_google_realtime_model(voice: str = None, model: str = None, instruction
             voice=chosen_voice,
             api_key=api_key,
             instructions=instructions,
+            **extra,
         )
     except (ImportError, AttributeError):
         pass
@@ -212,6 +260,7 @@ def _get_google_realtime_model(voice: str = None, model: str = None, instruction
             voice=chosen_voice,
             api_key=api_key,
             instructions=instructions,
+            **extra,
         )
     except (ImportError, AttributeError):
         pass
@@ -223,6 +272,7 @@ def _get_google_realtime_model(voice: str = None, model: str = None, instruction
             voice=chosen_voice,
             api_key=api_key,
             instructions=instructions,
+            **extra,
         )
     except (ImportError, AttributeError) as exc:
         raise RuntimeError(
