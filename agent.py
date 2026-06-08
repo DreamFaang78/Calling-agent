@@ -257,12 +257,27 @@ def _parse_participant_metadata(participant: rtc.RemoteParticipant) -> dict:
         meta = json.loads(raw)
     except Exception:
         pass
-    # SIP identity is typically sip:+NUMBER@domain
-    identity = participant.identity or ""
-    if "sip:" in identity:
-        num_part = identity.replace("sip:", "").split("@")[0]
-        if num_part and "phone_number" not in meta:
-            meta["phone_number"] = num_part
+
+    # Caller's phone number. OUTBOUND calls carry it in the metadata above
+    # (stamped by server._dispatch_call). INBOUND calls don't — recover it from
+    # the SIP attributes LiveKit sets on the participant, or from the identity,
+    # which is "sip_+NUMBER" (underscore) or "sip:+NUMBER@host" (colon).
+    if not (meta.get("phone_number") or meta.get("phone")):
+        attrs = getattr(participant, "attributes", None) or {}
+        sip_num = (
+            attrs.get("sip.phoneNumber")
+            or attrs.get("sip.from")
+            or attrs.get("sip.fromNumber")
+            or ""
+        )
+        if not sip_num:
+            identity = participant.identity or ""
+            for prefix in ("sip:", "sip_"):
+                if identity.startswith(prefix):
+                    sip_num = identity[len(prefix):].split("@")[0]
+                    break
+        if sip_num:
+            meta["phone_number"] = sip_num
     return meta
 
 

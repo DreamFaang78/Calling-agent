@@ -29,6 +29,14 @@ import argparse
 import asyncio
 import json
 import os
+import sys
+
+# Windows terminals default to cp1252, which can't encode the arrow/dash glyphs
+# we print below; force UTF-8 so this never crashes mid-provisioning on Windows.
+try:
+    sys.stdout.reconfigure(encoding="utf-8")
+except Exception:
+    pass
 
 from dotenv import load_dotenv
 

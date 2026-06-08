@@ -8,21 +8,33 @@ logger = logging.getLogger("calendar-integration")
 SCOPES = ["https://www.googleapis.com/auth/calendar.events"]
 
 def _get_credentials():
+    creds = None
     token_path = os.path.join(os.path.dirname(__file__), "token.json")
     if os.path.exists(token_path):
-        return Credentials.from_authorized_user_file(token_path, SCOPES)
-    
-    # Fallback for Coolify deployment: load from database setting injected into env
-    token_json_str = os.getenv("GOOGLE_OAUTH_TOKEN", "")
-    if token_json_str:
+        creds = Credentials.from_authorized_user_file(token_path, SCOPES)
+    else:
+        # Fallback for Coolify deployment: load from database setting injected into env
+        token_json_str = os.getenv("GOOGLE_OAUTH_TOKEN", "")
+        if token_json_str:
+            try:
+                import json
+                info = json.loads(token_json_str)
+                creds = Credentials.from_authorized_user_info(info, SCOPES)
+            except Exception as exc:
+                logger.error("Failed to parse GOOGLE_OAUTH_TOKEN: %s", exc)
+
+    # The minted access token expires in ~1 hour; without this refresh, every
+    # calendar read/write silently no-ops once it lapses (creds.valid == False),
+    # even though the long-lived refresh_token can mint a new one. Refresh it.
+    if creds and not creds.valid and creds.expired and creds.refresh_token:
         try:
-            import json
-            info = json.loads(token_json_str)
-            return Credentials.from_authorized_user_info(info, SCOPES)
+            from google.auth.transport.requests import Request
+            creds.refresh(Request())
+            logger.info("Refreshed expired Google Calendar access token.")
         except Exception as exc:
-            logger.error("Failed to parse GOOGLE_OAUTH_TOKEN: %s", exc)
-            
-    return None
+            logger.error("Failed to refresh Google OAuth token: %s", exc)
+
+    return creds
 
 async def check_google_calendar_availability(date_str: str, time_str: str, duration_minutes: int = 30) -> bool:
     """
