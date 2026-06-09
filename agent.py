@@ -502,12 +502,23 @@ async def _wait_until_call_ends(ctx: agents.JobContext) -> None:
     call so the conversation can actually happen.
     """
     done = asyncio.Event()
+    # Capture WHY we tore down so an inbound leg that drops right after connect
+    # (which surfaces as "on_enter greeting failed: AgentSession is closing")
+    # leaves a breadcrumb in the dashboard Live Logs instead of being silent.
+    reason_holder: dict = {"why": "unknown"}
 
-    def _on_disconnect(*_args) -> None:
+    def _on_participant_disconnect(participant) -> None:
+        ident = getattr(participant, "identity", "?")
+        reason_holder["why"] = f"participant_disconnected: {ident}"
         done.set()
 
-    ctx.room.on("participant_disconnected", _on_disconnect)
-    ctx.room.on("disconnected", _on_disconnect)
+    def _on_room_disconnect(*args) -> None:
+        # rtc.Room emits the disconnect reason as the first positional arg.
+        reason_holder["why"] = f"room_disconnected: reason={args[0] if args else '?'}"
+        done.set()
+
+    ctx.room.on("participant_disconnected", _on_participant_disconnect)
+    ctx.room.on("disconnected", _on_room_disconnect)
 
     try:
         # If there are already no remote participants, end promptly.
@@ -516,15 +527,23 @@ async def _wait_until_call_ends(ctx: agents.JobContext) -> None:
                 # Give a brief grace period in case the SIP participant is mid-join
                 await asyncio.sleep(1.0)
                 if len(ctx.room.remote_participants) == 0:
+                    reason_holder["why"] = "room empty (no remote participants)"
                     break
             try:
                 await asyncio.wait_for(done.wait(), timeout=2.0)
             except asyncio.TimeoutError:
                 continue
+        # Surface the teardown cause. For inbound this should tell us whether the
+        # caller's SIP leg dropped (provider/media issue) or the room emptied.
+        await _log(
+            "info",
+            f"_wait_until_call_ends exiting — {reason_holder['why']} "
+            f"(remote_participants={len(ctx.room.remote_participants)})",
+        )
     finally:
         try:
-            ctx.room.off("participant_disconnected", _on_disconnect)
-            ctx.room.off("disconnected", _on_disconnect)
+            ctx.room.off("participant_disconnected", _on_participant_disconnect)
+            ctx.room.off("disconnected", _on_room_disconnect)
         except Exception:
             pass
 
